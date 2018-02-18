@@ -1,0 +1,1 @@
+Tray window that simulates user input by injecting the f-24 key every ten seconds.
