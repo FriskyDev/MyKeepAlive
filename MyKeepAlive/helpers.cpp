@@ -16,43 +16,41 @@ RECT WorkAreaFromPoint(POINT pt)
     return mi.rcWork;
 }
 
+UINT DpiFromPt(POINT pt)
+{
+    UINT dpi;
+    GetDpiForMonitor(
+        MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST),
+        MDT_EFFECTIVE_DPI, &dpi, &dpi);
+    return dpi;
+}
+
 POINT KeepPointInRect(POINT pt, RECT rc)
 {
-    return{ min(max(pt.x, rc.left), rc.right),
-        min(max(pt.x, rc.top), rc.bottom) };
+    return { min(max(pt.x, rc.left), rc.right),
+             min(max(pt.x, rc.top), rc.bottom) };
 }
 
-
-POINT ptCursorPosClippedToWorkArea()
+RECT KeepRectInRect(RECT rcStartRect, RECT rcBounds)
 {
-    POINT pt;
-    GetCursorPos(&pt);
-    return KeepPointInRect(pt, WorkAreaFromPoint(pt));
-}
+    if (rcStartRect.top < rcBounds.top)
+    {
+        OffsetRect(&rcStartRect, 0, rcBounds.top - rcStartRect.top);
+    }
+    if (rcStartRect.bottom > rcBounds.bottom)
+    {
+        OffsetRect(&rcStartRect, 0, rcBounds.bottom - rcStartRect.bottom);
+    }
+    if (rcStartRect.left < rcBounds.left)
+    {
+        OffsetRect(&rcStartRect, rcBounds.left - rcStartRect.left, 0);
+    }
+    if (rcStartRect.right > rcBounds.right)
+    {
+        OffsetRect(&rcStartRect, rcBounds.right - rcStartRect.right, 0);
+    }
 
-RECT rcCursorPosClippedToWorkArea(int cx, int cy)
-{
-    POINT pt;
-    GetCursorPos(&pt);
-    RECT rc = { pt.x, pt.y, cx, cy };
-    RECT rcWork = WorkAreaFromPoint(pt);
-    if (rc.top < rcWork.top)
-    {
-        OffsetRect(&rc, 0, rcWork.top - rc.top);
-    }
-    if (rc.bottom > rcWork.bottom)
-    {
-        OffsetRect(&rc, 0, rc.bottom - rcWork.bottom);
-    }
-    if (rc.left < rcWork.left)
-    {
-        OffsetRect(&rc, 0, rcWork.left - rc.left);
-    }
-    if (rc.right > rcWork.right)
-    {
-        OffsetRect(&rc, 0, rc.right - rcWork.right);
-    }
-    return rc;
+    return rcStartRect;
 }
 
 void WellBehavedTrackPopup(HWND hwnd, HMENU hMenu, POINT pt)
@@ -62,4 +60,24 @@ void WellBehavedTrackPopup(HWND hwnd, HMENU hMenu, POINT pt)
         TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_BOTTOMALIGN,
         pt.x, pt.y, 0, hwnd, nullptr);
     PostMessage(hwnd, WM_NULL, 0, 0);
+}
+
+UINT GetDpiForWindow(HWND hwnd)
+{
+    typedef UINT(WINAPI *fnGetDpiForWindow)(HWND);
+    static fnGetDpiForWindow pfn = nullptr;
+
+    if (!pfn)
+    {
+        HMODULE hModUser32 = GetModuleHandle(_T("user32.dll"));
+        pfn = (fnGetDpiForWindow)GetProcAddress(hModUser32, "GetDpiForWindow");
+        if (!pfn)
+        {
+            Error(L"Can't find GetDpiForWindow!");
+            PostQuitMessage(0);
+            return 96;
+        }
+    }
+
+    return pfn(hwnd);
 }

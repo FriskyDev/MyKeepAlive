@@ -2,7 +2,8 @@
 
 #include <windows.h>
 #include "Windowsx.h"
-#include "Shellapi.h""
+#include "Shellapi.h"
+#include "ShellScalingAPI.h"
 #include <tchar.h>
 #include <string>
 #include "resource.h"
@@ -18,11 +19,18 @@ extern NOTIFYICONDATA nid;
 extern HWND hwndTooltip;
 
 void Error(std::wstring msg);
+UINT GetDpiForWindow(HWND hwnd);
 void WellBehavedTrackPopup(HWND hwnd, HMENU hMenu, POINT pt);
-RECT rcCursorPosClippedToWorkArea(int cx, int cy);
-POINT ptCursorPosClippedToWorkArea();
+RECT KeepRectInRect(RECT rcStartRect, RECT rc);
+POINT KeepPointInRect(POINT pt, RECT rc);
+RECT WorkAreaFromPoint(POINT pt);
+UINT DpiFromPt(POINT pt);
 
 LRESULT CALLBACK TrayWindowWndProc(
     HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+
+void ShowHoverTooltip();
+void HideHoverTooltip();
 LRESULT CALLBACK TooltipWndProc(
     HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+

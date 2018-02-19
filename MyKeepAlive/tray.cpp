@@ -10,8 +10,15 @@ int MinToAutoPause = -1;
 
 void InjectBogusKeyboardInput()
 {
-    static INPUT i = { INPUT_KEYBOARD ,{ VK_F24, 0, 0, 0, 0 } };
+    static INPUT i = { INPUT_KEYBOARD, { VK_F24, 0, 0, 0, 0 } };
     SendInput(1, &i, sizeof(INPUT));
+}
+
+POINT GetRightClipMenuPt()
+{
+    POINT pt;
+    GetCursorPos(&pt);
+    return KeepPointInRect(pt, WorkAreaFromPoint(pt));
 }
 
 void ShowRightClickMenu(HWND hwnd)
@@ -35,18 +42,7 @@ void ShowRightClickMenu(HWND hwnd)
 
     WellBehavedTrackPopup(hwnd,
         hMenu,
-        ptCursorPosClippedToWorkArea());
-}
-
-void ShowHoverTooltip()
-{
-    // TODO wtf is wrong with my rect math/ rcCursorPosClippedToWorkArea
-
-    //RECT rc = rcCursorPosClippedToWorkArea(500, 500);
-    SetWindowPos(hwndTooltip, nullptr,
-        //rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
-        50, 50, 100, 100,
-        SWP_SHOWWINDOW);
+        GetRightClipMenuPt());
 }
 
 LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -64,6 +60,7 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         case IDT_TIMER:
             InjectBogusKeyboardInput();
             break;
+
         case IDT_TIMER_LONG:
             if (MinToAutoPause == 0)
             {
@@ -83,6 +80,8 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         case WM_RBUTTONDOWN:
             ShowRightClickMenu(hwnd);
             break;
+        //case WM_MOUSEMOVE: // TODO: this messes with right click menu... but should be on hover
+            // maybe for hover, know if it's up, and ptinrect to close?
         case WM_LBUTTONDOWN:
             ShowHoverTooltip();
             break;
