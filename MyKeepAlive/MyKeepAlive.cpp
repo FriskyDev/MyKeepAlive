@@ -30,15 +30,13 @@ bool CreateTooltipWindow(HINSTANCE hInstance)
         return FALSE;
     }
 
-    HWND hwnd = CreateWindow(
+    HWND hwnd = CreateWindowEx(
+        WS_EX_TOOLWINDOW,
         szWindowTooltipClass,
         L"",
         WS_POPUP ,
         0, 0, 0, 0,
-        NULL,
-        NULL,
-        hInstance,
-        NULL);
+        nullptr, nullptr, hInstance, nullptr);
 
     if (hwnd == nullptr)
     {
@@ -72,8 +70,10 @@ bool CreateTrayWindow(HINSTANCE hInstance)
     }
 
     HWND hwnd = CreateWindow(
-        szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+        szWindowClass,
+        szTitle,
+        WS_OVERLAPPEDWINDOW,
+        0, 0, 0, 0,
         nullptr, nullptr, hInstance, nullptr);
 
     if (hwnd == nullptr)

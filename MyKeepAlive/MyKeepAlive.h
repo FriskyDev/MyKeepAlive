@@ -29,7 +29,8 @@ UINT DpiFromPt(POINT pt);
 LRESULT CALLBACK TrayWindowWndProc(
     HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 
-void ShowHoverTooltip();
+extern bool TooltipShowing;
+RECT ShowHoverTooltip(POINT pt);
 void HideHoverTooltip();
 LRESULT CALLBACK TooltipWndProc(
     HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);

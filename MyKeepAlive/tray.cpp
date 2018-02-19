@@ -7,12 +7,7 @@ const UINT TimerMS = 10000;     // 10 seconds
 const UINT LongTimerMS = 60000; // 1 minute
 bool paused = false;
 int MinToAutoPause = -1;
-
-void InjectBogusKeyboardInput()
-{
-    static INPUT i = { INPUT_KEYBOARD, { VK_F24, 0, 0, 0, 0 } };
-    SendInput(1, &i, sizeof(INPUT));
-}
+HWND hwndTray;
 
 POINT GetRightClipMenuPt()
 {
@@ -31,14 +26,20 @@ void ShowRightClickMenu(HWND hwnd)
 
     InsertMenu(hMenu, 0xFFFFFFFF,
         MF_BYPOSITION | MF_STRING,
-        IDM_TOGGLEPAUSE, paused ? L"Resume" : L"Pause");
+        IDM_TOGGLEPAUSE, L"Pause");
 
-    InsertMenu(hMenu, 0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_PAUSE_IN_5HRS, L"5 HR Pause");
+    CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
+        paused ? MF_CHECKED : MF_UNCHECKED);
 
-    CheckMenuItem(hMenu, IDM_PAUSE_IN_5HRS,
-        MinToAutoPause >= 0 ? MF_CHECKED : MF_UNCHECKED);
+    if (!paused)
+    {
+        InsertMenu(hMenu, 0xFFFFFFFF,
+            MF_BYPOSITION | MF_STRING,
+            IDM_PAUSE_IN_5HRS, L"5 HR Pause");
+
+        CheckMenuItem(hMenu, IDM_PAUSE_IN_5HRS,
+            MinToAutoPause >= 0 ? MF_CHECKED : MF_UNCHECKED);
+    }
 
     WellBehavedTrackPopup(hwnd,
         hMenu,
@@ -52,14 +53,19 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
     case WM_CREATE:
         SetTimer(hwnd, IDT_TIMER, TimerMS, nullptr);
         SetTimer(hwnd, IDT_TIMER_LONG, LongTimerMS, nullptr);
+        hwndTray = hwnd;
         break;
 
     case WM_TIMER:
         switch (LOWORD(wParam))
         {
         case IDT_TIMER:
-            InjectBogusKeyboardInput();
+        {
+            // Inject bogus keyboard input
+            static INPUT i = { INPUT_KEYBOARD,{ VK_F24, 0, 0, 0, 0 } };
+            SendInput(1, &i, sizeof(INPUT));
             break;
+        }
 
         case IDT_TIMER_LONG:
             if (MinToAutoPause == 0)
@@ -80,11 +86,18 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         case WM_RBUTTONDOWN:
             ShowRightClickMenu(hwnd);
             break;
-        //case WM_MOUSEMOVE: // TODO: this messes with right click menu... but should be on hover
-            // maybe for hover, know if it's up, and ptinrect to close?
+
         case WM_LBUTTONDOWN:
-            ShowHoverTooltip();
-            break;
+        {
+            // TODO: would ideally like for it to show/hide on hover over the icon
+            //       ... close without a click
+            if (!TooltipShowing)
+            {
+                POINT pt;
+                GetCursorPos(&pt);
+                ShowHoverTooltip(pt);
+            }
+        }
         }
         break;
 

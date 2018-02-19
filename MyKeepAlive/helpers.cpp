@@ -56,9 +56,11 @@ RECT KeepRectInRect(RECT rcStartRect, RECT rcBounds)
 void WellBehavedTrackPopup(HWND hwnd, HMENU hMenu, POINT pt)
 {
     SetForegroundWindow(hwnd);
+
     TrackPopupMenu(hMenu,
         TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_BOTTOMALIGN,
         pt.x, pt.y, 0, hwnd, nullptr);
+
     PostMessage(hwnd, WM_NULL, 0, 0);
 }
 
