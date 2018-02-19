@@ -3,11 +3,12 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
-NOTIFYICONDATA nid = {};
-HWND hwndTray = nullptr;
 const UINT TimerMS = 10000;          // 10 seconds
 const UINT LongTimerMS = 60000;      // 1 minute
 const UINT DelayTimeoutM = 60 * 5;   // 5 hours
+
+NOTIFYICONDATA nid = {};
+HWND hwndTray = nullptr;
 int DelayRemainingM = -1;
 
 void UpdateTooltipText()
@@ -22,7 +23,7 @@ void UpdateTooltipText()
         int min = DelayRemainingM - ((DelayRemainingM / 60) * 60);
 
         swprintf(nid.szTip, 128,
-                 L"Keep Alive\nWill pause in %i hr %i min",
+                 L"Keep Alive - Timer Running\n%i hr %i min remaining",
                  (DelayRemainingM / 60),
                  DelayRemainingM - ((DelayRemainingM / 60) * 60));
     }
@@ -81,12 +82,12 @@ void Click(bool rightClick)
     else
     {
         // TODO: for now disable preview window
-        //if (!PreviewShowing)
-        //{
-        //    POINT pt;
-        //    GetCursorPos(&pt);
-        //    ShowPreviewWindow(pt);
-        //}
+        if (!PreviewShowing)
+        {
+            POINT pt;
+            GetCursorPos(&pt);
+            ShowPreviewWindow(pt);
+        }
     }
 
     UpdateTooltipText();

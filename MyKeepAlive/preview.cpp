@@ -3,17 +3,57 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
-HWND hwndPreview = nullptr;
-const SIZE PreviewSize = { 250, 50 };
+const SIZE PreviewSize = { 300, 150 };
+const COLORREF rgbBackground = RGB(104, 197, 255);
 LPCWSTR FontName = L"Courier New";
 const int FontSize = 20;
+const int FontSizeSm = 15;
+
+HWND hwndPreview = nullptr;
 UINT dpi = 96;
-COLORREF rgbBackground = RGB(104, 197, 255);
 bool PreviewShowing = false;
 
-void DrawPreviewText(HDC hdc, RECT rc)
+#define STRLEN(str) (int)wcslen(str)
+#define DPISCALE(val, dpi) MulDiv(val, dpi, 96)
+
+void DrawPreviewText(HDC hdc, RECT rc, HFONT hfont, HFONT hfontSm)
 {
-    DrawText(hdc, L"Keep Alive!", 11, &rc, DT_VCENTER | DT_SINGLELINE | DT_CENTER);
+    InflateRect(&rc, -10, -10);
+
+    SelectFont(hdc, hfont);
+    LPCWSTR szHeader = L"Keep Alive";
+    DrawText(hdc, szHeader, STRLEN(szHeader), &rc, DT_CENTER);
+
+    rc.top += DPISCALE(FontSize, dpi) + DPISCALE(5, dpi);
+    SelectFont(hdc, hfontSm);
+    LPCWSTR szSubHeader = L"Injects f-24 key every\n10 seconds to simulate input.";
+    DrawText(hdc, szSubHeader, STRLEN(szSubHeader), &rc, DT_LEFT);
+
+    rc.top += 2 * DPISCALE(FontSizeSm, dpi) + DPISCALE(10, dpi);
+    LPCWSTR szStatusHeader = L"Current Status:";
+    DrawText(hdc, szStatusHeader, STRLEN(szStatusHeader), &rc, DT_LEFT);
+    rc.top += DPISCALE(FontSizeSm, dpi);
+
+    WCHAR StatusBuf[100];
+
+    if (paused)
+    {
+        swprintf((LPWSTR)&StatusBuf, 100, L"Inactive");
+    }
+    else if (DelayRemainingM >= 0)
+    {
+        rc.top += DPISCALE(10, dpi);
+        swprintf((LPWSTR)&StatusBuf, 100,
+            L"Active, set to go inactive\nin %i hr %i min",
+            (DelayRemainingM / 60),
+            DelayRemainingM - ((DelayRemainingM / 60) * 60));
+    }
+    else
+    {
+        swprintf((LPWSTR)&StatusBuf, 100, L"Running");
+    }
+
+    DrawText(hdc, (LPWSTR)&StatusBuf, STRLEN((LPWSTR)&StatusBuf), &rc, DT_LEFT);
 }
 
 void Draw(HDC hdc, HWND hwnd)
@@ -27,28 +67,48 @@ void Draw(HDC hdc, HWND hwnd)
     // cache font for the last DPI
     static UINT dpiLast = 0;
     static HFONT hfont = nullptr;
-    if (dpiLast != dpi || hfont == nullptr)
+    static HFONT hfontSm = nullptr;
+    if (dpiLast != dpi)
     {
         dpiLast = dpi;
 
+        if (hfont != nullptr)
+        {
+            DeleteFont(hfont);
+        }
+
         hfont = CreateFont(
-            MulDiv(FontSize, dpi, 96),
+            DPISCALE(FontSize, dpi),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            FontName);
+
+        if (hfontSm != nullptr)
+        {
+            DeleteFont(hfontSm);
+        }
+
+        hfontSm = CreateFont(
+            DPISCALE(FontSizeSm, dpi),
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             FontName);
     }
 
+    if (hfont == nullptr || hfontSm == nullptr)
+    {
+        Error(L"Draw preview window failed to create fonts.");
+    }
+
     SetBkMode(hdc, TRANSPARENT);
-    SelectFont(hdc, hfont);
-    DrawPreviewText(hdc, rc);
+    DrawPreviewText(hdc, rc, hfont, hfontSm);
 }
 
 RECT ShowPreviewWindow(POINT pt)
 {
     dpi = DpiFromPt(pt);
-    SIZE sz = { MulDiv(PreviewSize.cx, dpi, 96), MulDiv(PreviewSize.cy, dpi, 96) };
+    SIZE sz = { DPISCALE(PreviewSize.cx, dpi), DPISCALE(PreviewSize.cy, dpi) };
 
-    RECT rcStart = { pt.x, pt.y, pt.x + sz.cx, pt.y + sz.cy };
-    RECT rc = KeepRectInRect(rcStart, WorkAreaFromPoint(pt));
+    RECT rc = { pt.x, pt.y, pt.x + sz.cx, pt.y + sz.cy };
+    rc = KeepRectInRect(rc, WorkAreaFromPoint(pt));
 
     SetWindowPos(hwndPreview, nullptr,
         rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
@@ -91,7 +151,6 @@ LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM l
             HidePreviewWindow();
         }
         break;
-
     }
 
     return DefWindowProc(hwnd, message, wParam, lParam);

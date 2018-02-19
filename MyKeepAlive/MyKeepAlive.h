@@ -20,7 +20,7 @@ extern HINSTANCE hInstance;
 extern bool paused;
 
 // tray.cpp
-extern int MinToAutoPause;
+extern int DelayRemainingM;
 bool CreateTrayWindow();
 
 // preview.cpp

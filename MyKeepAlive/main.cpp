@@ -12,7 +12,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE _hInstance,
                       _In_ int)
 {
     hInstance = _hInstance;
-    if (CreateTrayWindow() /*&& CreatePreviewWindow()*/)
+    if (CreateTrayWindow() && CreatePreviewWindow())
     {
         MSG msg;
         while (GetMessage(&msg, nullptr, 0, 0))
