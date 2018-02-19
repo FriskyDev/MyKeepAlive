@@ -156,20 +156,21 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="helpers.cpp" />
-    <ClCompile Include="MyKeepAlive.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="tooltip.cpp" />
+    <ClCompile Include="preview.cpp" />
     <ClCompile Include="tray.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="MyKeepAlive.rc" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="kbd_hand.png" />
     <Image Include="MyKeepAlive.ico" />
     <Image Include="small.ico" />
   </ItemGroup>

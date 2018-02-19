@@ -32,16 +32,16 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="MyKeepAlive.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="helpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="tray.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="tooltip.cpp">
+    <ClCompile Include="preview.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -55,6 +55,9 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="MyKeepAlive.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="kbd_hand.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

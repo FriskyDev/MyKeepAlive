@@ -1,2 +1,2 @@
 
-#define IDI_MYKEEPALIVE 106
+#define IDI_HANDPIC     207

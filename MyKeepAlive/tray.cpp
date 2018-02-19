@@ -3,17 +3,38 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
-const UINT TimerMS = 10000;     // 10 seconds
-const UINT LongTimerMS = 60000; // 1 minute
-bool paused = false;
-int MinToAutoPause = -1;
-HWND hwndTray;
+NOTIFYICONDATA nid = {};
+HWND hwndTray = nullptr;
+const UINT TimerMS = 10000;          // 10 seconds
+const UINT LongTimerMS = 60000;      // 1 minute
+const UINT DelayTimeoutM = 60 * 5;   // 5 hours
+int DelayRemainingM = -1;
 
-POINT GetRightClipMenuPt()
+void UpdateTooltipText()
 {
-    POINT pt;
-    GetCursorPos(&pt);
-    return KeepPointInRect(pt, WorkAreaFromPoint(pt));
+    if (paused)
+    {
+        wcscpy_s(nid.szTip, L"Keep Alive - Paused");
+    }
+    else if (DelayRemainingM >= 0)
+    {
+        int hours = (DelayRemainingM / 60);
+        int min = DelayRemainingM - ((DelayRemainingM / 60) * 60);
+
+        swprintf(nid.szTip, 128,
+                 L"Keep Alive\nWill pause in %i hr %i min",
+                 (DelayRemainingM / 60),
+                 DelayRemainingM - ((DelayRemainingM / 60) * 60));
+    }
+    else
+    {
+        wcscpy_s(nid.szTip, L"Keep Alive - Running");
+    }
+
+    if (!Shell_NotifyIcon(NIM_MODIFY, &nid))
+    {
+        Error(L"Setting tooltip text failed! - Shell_NotifyIcon(MODIFY)");
+    }
 }
 
 void ShowRightClickMenu(HWND hwnd)
@@ -35,15 +56,111 @@ void ShowRightClickMenu(HWND hwnd)
     {
         InsertMenu(hMenu, 0xFFFFFFFF,
             MF_BYPOSITION | MF_STRING,
-            IDM_PAUSE_IN_5HRS, L"5 HR Pause");
+            IDM_TOGGLE5HRDELAY, L"Pause in 5 hrs");
+        // TODO: if on delay, replace text with 'pause in X hr Y m'
 
-        CheckMenuItem(hMenu, IDM_PAUSE_IN_5HRS,
-            MinToAutoPause >= 0 ? MF_CHECKED : MF_UNCHECKED);
+        CheckMenuItem(hMenu, IDM_TOGGLE5HRDELAY,
+            DelayRemainingM >= 0 ? MF_CHECKED : MF_UNCHECKED);
     }
 
-    WellBehavedTrackPopup(hwnd,
-        hMenu,
-        GetRightClipMenuPt());
+    // Open the menu at the cursor pos, but within the work area
+    POINT pt;
+    GetCursorPos(&pt);
+    POINT ptMenu = KeepPointInRect(pt, WorkAreaFromPoint(pt));
+    WellBehavedTrackPopup(hwnd, hMenu, ptMenu);
+
+    UpdateTooltipText();
+}
+
+void Click(bool rightClick)
+{
+    if (rightClick)
+    {
+        ShowRightClickMenu(hwndTray);
+    }
+    else
+    {
+        // TODO: for now disable preview window
+        //if (!PreviewShowing)
+        //{
+        //    POINT pt;
+        //    GetCursorPos(&pt);
+        //    ShowPreviewWindow(pt);
+        //}
+    }
+
+    UpdateTooltipText();
+}
+
+void Toggle5HrDelay()
+{
+    if (DelayRemainingM < 0)
+    {
+        DelayRemainingM = DelayTimeoutM;
+    }
+    else
+    {
+        DelayRemainingM = -1;
+    }
+
+    UpdateTooltipText();
+}
+
+void TogglePaused()
+{
+    paused = !paused;
+
+    UpdateTooltipText();
+}
+
+void Tick(bool LongTimer)
+{
+    if (LongTimer) /* IDT_TIMER_LONG, fires every minute */
+    {
+        if (DelayRemainingM == 0)
+        {
+            paused = true;
+        }
+        else if (DelayRemainingM > 0)
+        {
+            DelayRemainingM--;
+        }
+    }
+    else /* IDT_TIMER, fires every ten seconds */
+    {
+        if (!paused)
+        {
+            // Inject bogus keyboard input
+            static INPUT i = { INPUT_KEYBOARD,{ VK_F24, 0, 0, 0, 0 } };
+            SendInput(1, &i, sizeof(INPUT));
+        }
+    }
+
+    UpdateTooltipText();
+}
+
+bool InitTrayWindow(HWND hwnd)
+{
+    hwndTray = hwnd;
+    SetTimer(hwnd, IDT_TIMER, TimerMS, nullptr);
+    SetTimer(hwnd, IDT_TIMER_LONG, LongTimerMS, nullptr);
+
+    nid.cbSize = sizeof(NOTIFYICONDATA);
+    nid.hWnd = hwnd;
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_SHOWTIP | NIF_TIP;
+    nid.uID = IDI_HANDPIC;
+    nid.hIcon = LoadIcon(hInstance,
+        (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC));
+    nid.uCallbackMessage = WM_USER_SHELLICON;
+
+    if (!Shell_NotifyIcon(NIM_ADD, &nid))
+    {
+        Error(L"Shell_NotifyIcon failed!");
+        return false;
+    }
+
+    UpdateTooltipText();
+    return true;
 }
 
 LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -51,53 +168,23 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
     switch (message)
     {
     case WM_CREATE:
-        SetTimer(hwnd, IDT_TIMER, TimerMS, nullptr);
-        SetTimer(hwnd, IDT_TIMER_LONG, LongTimerMS, nullptr);
-        hwndTray = hwnd;
+        if (!InitTrayWindow(hwnd))
+        {
+            return -1;
+        }
         break;
 
     case WM_TIMER:
-        switch (LOWORD(wParam))
-        {
-        case IDT_TIMER:
-        {
-            // Inject bogus keyboard input
-            static INPUT i = { INPUT_KEYBOARD,{ VK_F24, 0, 0, 0, 0 } };
-            SendInput(1, &i, sizeof(INPUT));
-            break;
-        }
-
-        case IDT_TIMER_LONG:
-            if (MinToAutoPause == 0)
-            {
-                paused = true;
-            }
-            else if (MinToAutoPause > 0)
-            {
-                MinToAutoPause--;
-            }
-            break;
-        }
+        Tick(LOWORD(wParam) == IDT_TIMER_LONG);
         break;
 
     case WM_USER_SHELLICON:
         switch (LOWORD(lParam))
         {
         case WM_RBUTTONDOWN:
-            ShowRightClickMenu(hwnd);
-            break;
-
         case WM_LBUTTONDOWN:
-        {
-            // TODO: would ideally like for it to show/hide on hover over the icon
-            //       ... close without a click
-            if (!TooltipShowing)
-            {
-                POINT pt;
-                GetCursorPos(&pt);
-                ShowHoverTooltip(pt);
-            }
-        }
+            Click(LOWORD(lParam) == WM_RBUTTONDOWN);
+            break;
         }
         break;
 
@@ -106,26 +193,56 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         {
         case IDM_EXIT:
             PostQuitMessage(0);
+            Shell_NotifyIcon(NIM_DELETE, &nid);
             break;
 
         case IDM_TOGGLEPAUSE:
-            paused = !paused;
+            TogglePaused();
             break;
 
-        case IDM_PAUSE_IN_5HRS:
-            if (MinToAutoPause < 0)
-            {
-                MinToAutoPause = 60 * 5;
-            }
-            else
-            {
-                MinToAutoPause = -1;
-            }
-            break;
+        case IDM_TOGGLE5HRDELAY:
+            Toggle5HrDelay();
         }
         break;
     }
 
     return DefWindowProc(hwnd, message, wParam, lParam);
+}
+
+bool CreateTrayWindow()
+{
+    const LPCWSTR szTitle = L"keepalive";
+    const LPCWSTR szWindowClass = L"keepalive_class";
+
+    WNDCLASSEX wcex = {};
+    wcex.cbSize = sizeof(WNDCLASSEX);
+    wcex.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
+    wcex.lpfnWndProc = TrayWindowWndProc;
+    wcex.cbClsExtra = 0;
+    wcex.cbWndExtra = 0;
+    wcex.hInstance = hInstance;
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_HANDPIC));
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.lpszMenuName = nullptr;
+    wcex.lpszClassName = szWindowClass;
+    wcex.hIconSm = nullptr;
+    if (RegisterClassEx(&wcex) == 0)
+    {
+        Error(L"Register Tray failed!");
+        return false;
+    }
+
+    if (CreateWindow(szWindowClass,
+                     szTitle,
+                     WS_OVERLAPPEDWINDOW,
+                     0, 0, 0, 0,
+                     nullptr, nullptr, hInstance, nullptr) == nullptr)
+    {
+        Error(L"Create Tray failed!");
+        return false;
+    }
+
+    return true;
 }
 
