@@ -8,33 +8,42 @@
 #include "resource.h"
 using namespace std;
 
-#define IDT_TIMER 104
-#define IDM_EXIT 105
-#define IDM_TOGGLEPAUSE 106
-#define	WM_USER_SHELLICON WM_USER + 1
+#define IDT_TIMER           101
+#define IDT_TIMER_LONG      102
+#define IDM_EXIT            111
+#define IDM_TOGGLEPAUSE     112
+#define IDM_PAUSE_IN_5HRS   113
+#define	WM_USER_SHELLICON   WM_USER + 1
 
 HINSTANCE hInst = nullptr;
 LPCWSTR szTitle = L"keepalive";
 LPCWSTR szWindowClass = L"keepalive_class";
 HWND hwnd = nullptr;
 HMENU hMenu = nullptr;
-const UINT TimerMS = 10000; // 10 seconds
+NOTIFYICONDATA nid = {};
+
+const UINT TimerMS = 10000;     // 10 seconds
+const UINT LongTimerMS = 60000; // 1 minute
 bool paused = false;
+int MinToAutoPause = -1;
 
-__inline void Error(std::wstring msg) {
-    MessageBox(nullptr, msg.c_str(), _T("Error"), MB_OK); }
-
-
-void TickTimer()
+void Error(std::wstring msg)
 {
-    if (!paused)
-    {
-        static INPUT i = {
-            INPUT_KEYBOARD ,
-            { VK_F24, 0 /*wScan*/, 0 /*dwFlags*/, 0 /*time*/, 0 /*dwExtraInfo*/ }
-        };
-        SendInput(1, &i, sizeof(INPUT));
-    }
+    MessageBox(nullptr, msg.c_str(), _T("Error"), MB_OK);
+}
+
+void InjectBogusKeyboardInput()
+{
+    static INPUT i = { INPUT_KEYBOARD , { VK_F24, 0, 0, 0, 0 } };
+    SendInput(1, &i, sizeof(INPUT));
+}
+
+RECT rcWorkFromPt(POINT pt)
+{    
+    MONITORINFOEX mi;
+    mi.cbSize = sizeof(MONITORINFOEX);
+    GetMonitorInfo(MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST), &mi);
+    return mi.rcWork;
 }
 
 void ShowPopupMenu(HWND hwnd)
@@ -49,12 +58,81 @@ void ShowPopupMenu(HWND hwnd)
         MF_BYPOSITION | MF_STRING,
         IDM_TOGGLEPAUSE, paused ? L"Resume" : L"Pause");
 
+    InsertMenu(hMenu, 0xFFFFFFFF,
+        MF_BYPOSITION | MF_STRING,
+        IDM_PAUSE_IN_5HRS, L"5 HR Pause");
+
+    CheckMenuItem(hMenu, IDM_PAUSE_IN_5HRS,
+        MinToAutoPause >= 0 ? MF_CHECKED : MF_UNCHECKED);
+
     POINT pt;
     GetCursorPos(&pt);
+    RECT rcWork = rcWorkFromPt(pt);
+    pt.x = min(max(pt.x, rcWork.left), rcWork.right);
+    pt.y = min(max(pt.x, rcWork.top), rcWork.bottom);
 
-    TrackPopupMenu(hMenu, // TODO: how to dismiss more cleanly...
-        TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_BOTTOMALIGN,
-        pt.x, pt.y, 0, hwnd, nullptr);
+    SetForegroundWindow(hwnd); // weird hack to dismiss menu when loses activation
+    TrackPopupMenu(hMenu,
+                   TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_BOTTOMALIGN,
+                   pt.x, pt.y, 0, hwnd, nullptr);
+    PostMessage(hwnd, WM_NULL, 0, 0);
+}
+
+void PopupMenuMessage(UINT message)
+{
+    switch (message)
+    {
+    case IDM_EXIT:
+        PostQuitMessage(0);
+        break;
+
+    case IDM_TOGGLEPAUSE:
+        paused = !paused;
+        break;
+
+    case IDM_PAUSE_IN_5HRS:
+        if (MinToAutoPause < 0)
+        {
+            MinToAutoPause = 60 * 5;
+        }
+        else
+        {
+            MinToAutoPause = -1;
+        }
+        break;
+    }
+}
+
+void TrayWindowInputMessage(UINT message)
+{
+    switch (message)
+    {
+    case WM_RBUTTONDOWN:
+        ShowPopupMenu(hwnd);
+        break;
+    }
+}
+
+void HandleTimer(bool LongTimer)
+{
+    if (LongTimer)
+    {
+        if (MinToAutoPause == 0)
+        {
+            paused = true;
+        }
+        else if (MinToAutoPause > 0)
+        {
+            MinToAutoPause--;
+        }
+    }
+    else
+    {
+        if (!paused)
+        {
+            InjectBogusKeyboardInput();
+        }
+    }
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -63,43 +141,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
         SetTimer(hwnd, IDT_TIMER, TimerMS, nullptr);
+        SetTimer(hwnd, IDT_TIMER_LONG, LongTimerMS, nullptr);
         break;
+
     case WM_TIMER:
-        if (wParam == IDT_TIMER)
-        {
-            TickTimer();
-        }
+        HandleTimer(wParam == IDT_TIMER_LONG);
         break;
 
     case WM_USER_SHELLICON:
-    {
-        switch (LOWORD(lParam))
-        {
-        case WM_RBUTTONDOWN:
+        if (LOWORD(lParam) == WM_RBUTTONDOWN) {
             ShowPopupMenu(hwnd);
-            break;
-
-        // TODO: do something on left click/ hover,
-        //       maybe show last inject/ count, something...
         }
-    }
-    break;
+        break;
     
     case WM_COMMAND:
-    {
-        switch (LOWORD(wParam))
-        {
-        case IDM_EXIT:
-            // TODO: refresh taskbar so icon goes away smoothly
-            PostQuitMessage(0);
-            break;
-
-        case IDM_TOGGLEPAUSE:
-            paused = !paused;
-            break;
-        }
-    }
-    break;
+        PopupMenuMessage(LOWORD(wParam));
+        break;
     }
 
     return DefWindowProc(hwnd, message, wParam, lParam);
@@ -140,14 +197,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return 1;
     }
 
-    NOTIFYICONDATA nid = {};
     nid.cbSize = sizeof(NOTIFYICONDATA);
     nid.hWnd = hwnd;
-    nid.uFlags = NIF_ICON | NIF_MESSAGE;
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_SHOWTIP;
     nid.uID = IDI_MYKEEPALIVE;
     nid.hIcon = LoadIcon(hInstance,
         (LPCTSTR)MAKEINTRESOURCE(IDI_MYKEEPALIVE));
     nid.uCallbackMessage = WM_USER_SHELLICON;
+
+    //wcscpy_s(nid.szTip, _TEXT("tooltip"));
+
     if (!Shell_NotifyIcon(NIM_ADD, &nid))
     {
         Error(L"Shell_NotifyIcon failed!");
@@ -161,5 +220,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         DispatchMessage(&msg);
     }
 
+    Shell_NotifyIcon(NIM_DELETE, &nid);
     return 0;
 }
