@@ -26,6 +26,7 @@ extern bool paused;
 extern int TotalTimeRunningM;
 extern int DelayRemainingM;
 bool CreateTrayWindow();
+void TogglePaused();
 
 // preview.cpp
 extern bool PreviewShowing;

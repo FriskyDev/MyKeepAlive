@@ -4,86 +4,18 @@
 using namespace std;
 
 const SIZE PreviewSize = { 300, 150 };
-const COLORREF rgbBackground = RGB(104, 197, 255);
-LPCWSTR FontName = L"Courier New";
+const COLORREF rgbBackground = RGB(91, 224, 76);
+const COLORREF rgbBackgroundPaused = RGB(242, 207, 31);
+const LPCWSTR FontName = L"Courier New";
 const int FontSize = 20;
 const int FontSizeSm = 15;
 
 HWND hwndPreview = nullptr;
 bool PreviewShowing = false;
+RECT rcTogglePause = {};
 
 UINT dpi = 96;
 #define DPISCALE(val) MulDiv(val, dpi, 96)
-
-void DrawPreviewText(HDC hdc, RECT rc, HFONT hfont, HFONT hfontSm)
-{
-    // Draw the preview window. Fonts and background already done.
-
-    InflateRect(&rc, DPISCALE(-10) , DPISCALE(-10));
-
-    SelectFont(hdc, hfont);
-    LPCWSTR szHeader = L"Keep Alive";
-    DrawText(hdc, szHeader, STRLEN(szHeader), &rc, DT_CENTER);
-    rc.top += DPISCALE(FontSize) + DPISCALE(5);
-
-    SelectFont(hdc, hfontSm);
-    LPCWSTR szSubHeader = L"Injects f-24 key every\n10 seconds to simulate input.";
-    DrawText(hdc, szSubHeader, STRLEN(szSubHeader), &rc, DT_LEFT);
-    rc.top += 2 * DPISCALE(FontSizeSm) + DPISCALE(10);
-
-    LPCWSTR szStatusHeader = L"Current Status:";
-    DrawText(hdc, szStatusHeader, STRLEN(szStatusHeader), &rc, DT_LEFT);
-    rc.top += DPISCALE(FontSizeSm);
-
-    WCHAR StatusBuf[100];
-
-    if (paused)
-    {
-        swprintf(BUFSTR(StatusBuf), 100, L"Inactive");
-    }
-    else if (DelayRemainingM >= 0)
-    {
-        UINT days, hours, minutes;
-        DaysMinsSecsFromMinutes(DelayRemainingM, &days, &hours, &minutes);
-
-        swprintf(BUFSTR(StatusBuf), 100,
-            L"Will pause in %i hr %i min", hours, minutes);
-    }
-    else
-    {
-        swprintf(BUFSTR(StatusBuf), 100, L"Running");
-    }
-
-    DrawText(hdc, BUFSTR(StatusBuf), STRLEN(BUFSTR(StatusBuf)), &rc, DT_LEFT);
-    rc.top += DPISCALE(10);
-
-    if (TotalTimeRunningM > 0)
-    {
-        UINT days, hours, minutes;
-        DaysMinsSecsFromMinutes(TotalTimeRunningM, &days, &hours, &minutes);
-
-        WCHAR TotalTimeBuf[100];
-        if (days > 0)
-        {
-            swprintf(BUFSTR(TotalTimeBuf), 100,
-                L"%i days, %i hours, %i min",
-                days, hours, minutes);
-        }
-        else if (hours > 0)
-        {
-            swprintf(BUFSTR(TotalTimeBuf), 100,
-                L"%i hours, %i min", hours, minutes);
-        }
-        else
-        {
-            swprintf(BUFSTR(TotalTimeBuf), 100,
-                L"%i min", minutes);
-        }
-
-        DrawText(hdc, BUFSTR(TotalTimeBuf), STRLEN(BUFSTR(TotalTimeBuf)),
-            &rc, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
-    }
-}
 
 void GetFontsFromCache(UINT dpi, _Out_ HFONT* hfont, _Out_ HFONT* hfontSm)
 {
@@ -129,19 +61,80 @@ void GetFontsFromCache(UINT dpi, _Out_ HFONT* hfont, _Out_ HFONT* hfontSm)
 
 void Draw(HDC hdc, HWND hwnd)
 {
-    // Fill background color
-    static HBRUSH hbr = CreateSolidBrush(rgbBackground);
-    RECT rc;
-    GetClientRect(hwnd, &rc);
-    FillRect(hdc, &rc, hbr);
-
     // Get/ create fonts for the current dpi
     HFONT hfont, hfontSm;
     GetFontsFromCache(dpi, &hfont, &hfontSm);
 
     // Do text stuff
     SetBkMode(hdc, TRANSPARENT);
-    DrawPreviewText(hdc, rc, hfont, hfontSm);
+
+    // Fill background color
+    static HBRUSH hbrActive = CreateSolidBrush(rgbBackground);
+    static HBRUSH hbrInactive = CreateSolidBrush(rgbBackgroundPaused);
+
+    RECT rc;
+    GetClientRect(hwnd, &rc);
+    FillRect(hdc, &rc, paused ? hbrInactive : hbrActive);
+
+    InflateRect(&rc, DPISCALE(-10) , DPISCALE(-10));
+
+    SelectFont(hdc, hfont);
+    LPCWSTR szHeader = L"Keep Alive";
+    DrawText(hdc, szHeader, STRLEN(szHeader), &rc, DT_CENTER);
+    rc.top += DPISCALE(FontSize) + DPISCALE(5);
+
+    SelectFont(hdc, hfontSm);
+    LPCWSTR szSubHeader = L"Injects f-24 key every\n10 seconds to simulate input.";
+    DrawText(hdc, szSubHeader, STRLEN(szSubHeader), &rc, DT_LEFT);
+    rc.top += 2 * DPISCALE(FontSizeSm) + DPISCALE(10);
+
+    const int buttonsize = DPISCALE(25);
+    const int buf = DPISCALE(5);
+    rcTogglePause = { rc.left, rc.top,
+                      rc.left + buttonsize + buf,
+                      rc.top + buttonsize + buf };
+    FillRect(hdc, &rcTogglePause, paused ? hbrActive : hbrInactive);
+    rc.left += buttonsize + (2 * buf);
+    
+    WCHAR StatusBuf[100];
+    if (paused)
+    {
+        swprintf(BUFSTR(StatusBuf), 100, L"Status: Inactive\n(NOT injecting input)");
+    }
+    else
+    {
+        swprintf(BUFSTR(StatusBuf), 100, L"Status: Running\n(injecting ghost input)");
+    }
+
+    DrawText(hdc, BUFSTR(StatusBuf), STRLEN(BUFSTR(StatusBuf)), &rc, DT_LEFT);
+    rc.top += DPISCALE(10);
+
+    if (TotalTimeRunningM > 0)
+    {
+        UINT days, hours, minutes;
+        DaysMinsSecsFromMinutes(TotalTimeRunningM, &days, &hours, &minutes);
+
+        WCHAR TotalTimeBuf[100];
+        if (days > 0)
+        {
+            swprintf(BUFSTR(TotalTimeBuf), 100,
+                L"%i days, %i hours, %i min",
+                days, hours, minutes);
+        }
+        else if (hours > 0)
+        {
+            swprintf(BUFSTR(TotalTimeBuf), 100,
+                L"%i hours, %i min", hours, minutes);
+        }
+        else
+        {
+            swprintf(BUFSTR(TotalTimeBuf), 100,
+                L"%i min", minutes);
+        }
+
+        DrawText(hdc, BUFSTR(TotalTimeBuf), STRLEN(BUFSTR(TotalTimeBuf)),
+            &rc, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
+    }
 }
 
 void ShowPreviewWindow()
@@ -201,6 +194,17 @@ LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM l
         HDC hdc = BeginPaint(hwnd, &ps);
         Draw(hdc, hwnd);
         EndPaint(hwnd, &ps);
+        break;
+    }
+
+    case WM_LBUTTONDOWN:
+    {
+        POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+        if (PtInRect(&rcTogglePause, pt))
+        {
+            TogglePaused();
+            InvalidateRect(hwnd, nullptr, true);
+        }
         break;
     }
 
