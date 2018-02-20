@@ -14,10 +14,10 @@ int TotalTimeRunningM = 0;
 
 void UpdateTrayIcon()
 {
-    UINT icoID = paused ? IDI_HANDPIC : IDI_HANDPIC_ACTIVE;
+    // Called when paused changes, update tray icon
 
     nid.hIcon = LoadIcon(hInstance,
-        (LPCTSTR)MAKEINTRESOURCE(icoID));
+        (LPCTSTR)MAKEINTRESOURCE(paused ? IDI_HANDPIC : IDI_HANDPIC_ACTIVE));
 
     if (!Shell_NotifyIcon(NIM_MODIFY, &nid))
     {
@@ -27,6 +27,8 @@ void UpdateTrayIcon()
 
 void UpdateTooltipText()
 {
+    // Called when active/ delay state changes, update tooltip (hover bubble) text
+
     if (paused)
     {
         wcscpy_s(nid.szTip, L"Keep Alive - Paused");
@@ -51,59 +53,66 @@ void UpdateTooltipText()
     }
 }
 
-void ShowRightClickMenu(HWND hwnd)
-{
-    HMENU hMenu = CreatePopupMenu();
-
-    InsertMenu(hMenu, 0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_EXIT, L"Exit");
-
-    InsertMenu(hMenu, 0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_TOGGLEPAUSE, L"Pause");
-
-    CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
-        paused ? MF_CHECKED : MF_UNCHECKED);
-
-    if (!paused)
-    {
-        InsertMenu(hMenu, 0xFFFFFFFF,
-            MF_BYPOSITION | MF_STRING,
-            IDM_TOGGLE5HRDELAY, L"Pause in 5 hrs");
-        // TODO: if on delay, replace text with 'pause in X hr Y m'
-
-        CheckMenuItem(hMenu, IDM_TOGGLE5HRDELAY,
-            DelayRemainingM >= 0 ? MF_CHECKED : MF_UNCHECKED);
-    }
-
-    // Open the menu at the cursor pos, but within the work area
-    POINT pt;
-    GetCursorPos(&pt);
-    POINT ptMenu = KeepPointInRect(pt, WorkAreaFromPoint(pt));
-    WellBehavedTrackPopup(hwnd, hMenu, ptMenu);
-
-    UpdateTooltipText();
-}
-
 void Click(bool rightClick)
 {
     if (rightClick)
     {
-        ShowRightClickMenu(hwndTray);
+        // Right click creates an on-the-fly menu and shows it near the cursor
+
+        HMENU hMenu = CreatePopupMenu();
+
+        // Add the exit option
+        InsertMenu(hMenu, 0xFFFFFFFF,
+            MF_BYPOSITION | MF_STRING,
+            IDM_EXIT, L"Exit");
+
+        // Add the pause option and 'check' it if we're paused
+        InsertMenu(hMenu, 0xFFFFFFFF,
+            MF_BYPOSITION | MF_STRING,
+            IDM_TOGGLEPAUSE, L"Pause");
+
+        CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
+            paused ? MF_CHECKED : MF_UNCHECKED);
+
+        if (!paused)
+        {
+            // Add the 'delay pause' button (if not paused), and check if there's a delay
+
+            bool delayset = (DelayRemainingM >= 0);
+
+            WCHAR mnItemBuf[100];
+            if (delayset)
+            {
+                UINT days, hours, minutes;
+                DaysMinsSecsFromMinutes(DelayRemainingM, &days, &hours, &minutes);
+
+                swprintf(BUFSTR(mnItemBuf), 100,
+                    L"Pause in %i hr %i min", hours, minutes);
+            }
+            else
+            {
+                swprintf(BUFSTR(mnItemBuf), 100, L"Pause in 5 hours");
+            }
+
+            InsertMenu(hMenu, 0xFFFFFFFF,
+                MF_BYPOSITION | MF_STRING,
+                IDM_TOGGLE5HRDELAY, BUFSTR(mnItemBuf));
+
+            CheckMenuItem(hMenu, IDM_TOGGLE5HRDELAY,
+                delayset ? MF_CHECKED : MF_UNCHECKED);
+        }
+
+        // Open the menu at the cursor pos, but within the work area
+        POINT pt;
+        GetCursorPos(&pt);
+        POINT ptMenu = KeepPointInRect(pt, WorkAreaFromPoint(pt));
+        WellBehavedTrackPopup(hwndTray, hMenu, ptMenu);
     }
     else
     {
-        // TODO: for now disable preview window
-        if (!PreviewShowing)
-        {
-            POINT pt;
-            GetCursorPos(&pt);
-            ShowPreviewWindow(pt);
-        }
+        // Left click shows the preview window
+        ShowPreviewWindow();
     }
-
-    UpdateTooltipText();
 }
 
 void Toggle5HrDelay()
@@ -166,10 +175,8 @@ bool InitTrayWindow(HWND hwnd)
     nid.cbSize = sizeof(NOTIFYICONDATA);
     nid.hWnd = hwnd;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_SHOWTIP | NIF_TIP;
-    nid.uID = IDI_HANDPIC;
-    nid.hIcon = LoadIcon(hInstance,
-        (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC));
     nid.uCallbackMessage = WM_USER_SHELLICON;
+    nid.uID = 13542; // each tray icon declares a unique id? weird.
 
     if (!Shell_NotifyIcon(NIM_ADD, &nid))
     {
@@ -178,7 +185,17 @@ bool InitTrayWindow(HWND hwnd)
     }
 
     UpdateTooltipText();
+    UpdateTrayIcon();
     return true;
+}
+
+void OnExit()
+{
+    // Tray closing, deregister, destroy preview window, exit message loop.
+
+    Shell_NotifyIcon(NIM_DELETE, &nid);
+    DestroyWindow(hwndPreview);
+    PostQuitMessage(0);
 }
 
 LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -210,8 +227,7 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         switch (LOWORD(wParam))
         {
         case IDM_EXIT:
-            PostQuitMessage(0);
-            Shell_NotifyIcon(NIM_DELETE, &nid);
+            OnExit();
             break;
 
         case IDM_TOGGLEPAUSE:
@@ -236,11 +252,7 @@ bool CreateTrayWindow()
     wcex.cbSize = sizeof(WNDCLASSEX);
     wcex.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
     wcex.lpfnWndProc = TrayWindowWndProc;
-    wcex.cbClsExtra = 0;
-    wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
-    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_HANDPIC));
-    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wcex.lpszMenuName = nullptr;
     wcex.lpszClassName = szWindowClass;

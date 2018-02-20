@@ -15,6 +15,9 @@
 #define IDM_TOGGLE5HRDELAY  113
 #define	WM_USER_SHELLICON   WM_USER + 1
 
+#define STRLEN(str) (int)wcslen(str)
+#define BUFSTR(buf) (LPWSTR)&buf
+
 // main.cpp
 extern HINSTANCE hInstance;
 extern bool paused;
@@ -26,8 +29,9 @@ bool CreateTrayWindow();
 
 // preview.cpp
 extern bool PreviewShowing;
+extern HWND hwndPreview;
 bool CreatePreviewWindow();
-RECT ShowPreviewWindow(POINT pt);
+void ShowPreviewWindow();
 void HidePreviewWindow();
 
 // helpers.cpp
@@ -41,3 +45,4 @@ UINT DpiFromPt(POINT pt);
 void DaysMinsSecsFromMinutes(
     _In_ UINT minutes, _Out_ UINT* days,
     _Out_ UINT* hours, _Out_ UINT* minutesRemaining);
+

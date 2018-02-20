@@ -6,6 +6,7 @@ using namespace std;
 void Error(std::wstring msg)
 {
     MessageBox(nullptr, msg.c_str(), _T("Error"), MB_OK);
+    PostQuitMessage(1);
 }
 
 RECT WorkAreaFromPoint(POINT pt)
@@ -76,7 +77,6 @@ UINT GetDpiForWindow(HWND hwnd)
         if (!pfn)
         {
             Error(L"Can't find GetDpiForWindow!");
-            PostQuitMessage(0);
             return 96;
         }
     }
