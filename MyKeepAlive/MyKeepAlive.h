@@ -20,6 +20,7 @@ extern HINSTANCE hInstance;
 extern bool paused;
 
 // tray.cpp
+extern int TotalTimeRunningM;
 extern int DelayRemainingM;
 bool CreateTrayWindow();
 
@@ -37,3 +38,6 @@ RECT KeepRectInRect(RECT rcStartRect, RECT rc);
 POINT KeepPointInRect(POINT pt, RECT rc);
 RECT WorkAreaFromPoint(POINT pt);
 UINT DpiFromPt(POINT pt);
+void DaysMinsSecsFromMinutes(
+    _In_ UINT minutes, _Out_ UINT* days,
+    _Out_ UINT* hours, _Out_ UINT* minutesRemaining);

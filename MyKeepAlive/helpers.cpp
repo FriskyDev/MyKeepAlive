@@ -83,3 +83,18 @@ UINT GetDpiForWindow(HWND hwnd)
 
     return pfn(hwnd);
 }
+
+void DaysMinsSecsFromMinutes(
+    _In_ UINT minutes,
+    _Out_ UINT* days,
+    _Out_ UINT* hours,
+    _Out_ UINT* minutesRemaining)
+{
+    *days = (minutes / 60 / 12);
+    minutes -= (*days * 12 * 60);
+
+    *hours = (minutes / 60);
+    minutes -= (*hours * 60);
+
+    *minutesRemaining = minutes;
+}

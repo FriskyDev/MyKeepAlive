@@ -23,13 +23,13 @@ void DrawPreviewText(HDC hdc, RECT rc, HFONT hfont, HFONT hfontSm)
     SelectFont(hdc, hfont);
     LPCWSTR szHeader = L"Keep Alive";
     DrawText(hdc, szHeader, STRLEN(szHeader), &rc, DT_CENTER);
-
     rc.top += DPISCALE(FontSize, dpi) + DPISCALE(5, dpi);
+
     SelectFont(hdc, hfontSm);
     LPCWSTR szSubHeader = L"Injects f-24 key every\n10 seconds to simulate input.";
     DrawText(hdc, szSubHeader, STRLEN(szSubHeader), &rc, DT_LEFT);
-
     rc.top += 2 * DPISCALE(FontSizeSm, dpi) + DPISCALE(10, dpi);
+
     LPCWSTR szStatusHeader = L"Current Status:";
     DrawText(hdc, szStatusHeader, STRLEN(szStatusHeader), &rc, DT_LEFT);
     rc.top += DPISCALE(FontSizeSm, dpi);
@@ -42,11 +42,14 @@ void DrawPreviewText(HDC hdc, RECT rc, HFONT hfont, HFONT hfontSm)
     }
     else if (DelayRemainingM >= 0)
     {
-        rc.top += DPISCALE(10, dpi);
+        UINT days, hours, minutes;
+        DaysMinsSecsFromMinutes(DelayRemainingM, &days, &hours, &minutes);
+
+        //rc.top += DPISCALE(5, dpi);
         swprintf((LPWSTR)&StatusBuf, 100,
-            L"Active, set to go inactive\nin %i hr %i min",
-            (DelayRemainingM / 60),
-            DelayRemainingM - ((DelayRemainingM / 60) * 60));
+            L"Will pause in %i hr %i min",
+            hours, minutes);
+        //rc.top += DPISCALE(FontSizeSm, dpi);
     }
     else
     {
@@ -54,40 +57,62 @@ void DrawPreviewText(HDC hdc, RECT rc, HFONT hfont, HFONT hfontSm)
     }
 
     DrawText(hdc, (LPWSTR)&StatusBuf, STRLEN((LPWSTR)&StatusBuf), &rc, DT_LEFT);
+    rc.top += DPISCALE(10, dpi);
+
+
+    if (TotalTimeRunningM > 0)
+    {
+        UINT days, hours, minutes;
+        DaysMinsSecsFromMinutes(TotalTimeRunningM, &days, &hours, &minutes);
+
+        WCHAR TotalTimeBuf[100];
+        if (days > 0)
+        {
+            swprintf((LPWSTR)&TotalTimeBuf, 100,
+                L"%i days, %i hours, %i min",
+                days, hours, minutes);
+        }
+        else if (hours > 0)
+        {
+            swprintf((LPWSTR)&TotalTimeBuf, 100,
+                L"%i hours, %i min", hours, minutes);
+        }
+        else
+        {
+            swprintf((LPWSTR)&TotalTimeBuf, 100,
+                L"%i min", minutes);
+        }
+
+        DrawText(hdc, (LPWSTR)&TotalTimeBuf, STRLEN((LPWSTR)&TotalTimeBuf),
+            &rc, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
+    }
 }
 
-void Draw(HDC hdc, HWND hwnd)
+void GetFontsFromCache(UINT dpi, _Out_ HFONT* hfont, _Out_ HFONT* hfontSm)
 {
-    // fill background color
-    static HBRUSH hbr = CreateSolidBrush(rgbBackground);
-    RECT rc;
-    GetClientRect(hwnd, &rc);
-    FillRect(hdc, &rc, hbr);
-
-    // cache font for the last DPI
     static UINT dpiLast = 0;
-    static HFONT hfont = nullptr;
-    static HFONT hfontSm = nullptr;
+    static HFONT hfontLast = nullptr;
+    static HFONT hfontSmLast = nullptr;
     if (dpiLast != dpi)
     {
         dpiLast = dpi;
 
-        if (hfont != nullptr)
+        if (hfontLast != nullptr)
         {
-            DeleteFont(hfont);
+            DeleteFont(hfontLast);
         }
 
-        hfont = CreateFont(
+        hfontLast = CreateFont(
             DPISCALE(FontSize, dpi),
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             FontName);
 
-        if (hfontSm != nullptr)
+        if (hfontSmLast != nullptr)
         {
-            DeleteFont(hfontSm);
+            DeleteFont(hfontSmLast);
         }
 
-        hfontSm = CreateFont(
+        hfontSmLast = CreateFont(
             DPISCALE(FontSizeSm, dpi),
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             FontName);
@@ -98,22 +123,44 @@ void Draw(HDC hdc, HWND hwnd)
         Error(L"Draw preview window failed to create fonts.");
     }
 
+    *hfont = hfontLast;
+    *hfontSm = hfontSmLast;
+}
+
+void Draw(HDC hdc, HWND hwnd)
+{
+    // fill background color
+    static HBRUSH hbr = CreateSolidBrush(rgbBackground);
+    RECT rc;
+    GetClientRect(hwnd, &rc);
+    FillRect(hdc, &rc, hbr);
+
+    // get/ create fonts for the current dpi
+    HFONT hfont, hfontSm;
+    GetFontsFromCache(dpi, &hfont, &hfontSm);
+
+    // do text stuff
     SetBkMode(hdc, TRANSPARENT);
     DrawPreviewText(hdc, rc, hfont, hfontSm);
 }
 
 RECT ShowPreviewWindow(POINT pt)
 {
+    // from the anchor point, get the DPI, then scale default size to actual size
     dpi = DpiFromPt(pt);
     SIZE sz = { DPISCALE(PreviewSize.cx, dpi), DPISCALE(PreviewSize.cy, dpi) };
 
+    // final placement is anchor point, extended by size, then moved to be
+    // entirely in the current monitor's work area
     RECT rc = { pt.x, pt.y, pt.x + sz.cx, pt.y + sz.cy };
     rc = KeepRectInRect(rc, WorkAreaFromPoint(pt));
 
+    // position window
     SetWindowPos(hwndPreview, nullptr,
         rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
         SWP_SHOWWINDOW);
 
+    // give foreground (to ensure we get a de-activate message we can use to auto-hide)
     SetForegroundWindow(hwndPreview);
 
     PreviewShowing = true;
@@ -174,7 +221,8 @@ bool CreatePreviewWindow()
     wcex.lpszClassName = szPreviewWindowClass;
     wcex.hIconSm = NULL;
 
-    if (RegisterClassEx(&wcex) == 0) {
+    if (RegisterClassEx(&wcex) == 0)
+    {
         Error(L"Registering Preview Window Failed");
         return FALSE;
     }

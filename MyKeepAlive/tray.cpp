@@ -10,6 +10,20 @@ const UINT DelayTimeoutM = 60 * 5;   // 5 hours
 NOTIFYICONDATA nid = {};
 HWND hwndTray = nullptr;
 int DelayRemainingM = -1;
+int TotalTimeRunningM = 0;
+
+void UpdateTrayIcon()
+{
+    UINT icoID = paused ? IDI_HANDPIC : IDI_HANDPIC_ACTIVE;
+
+    nid.hIcon = LoadIcon(hInstance,
+        (LPCTSTR)MAKEINTRESOURCE(icoID));
+
+    if (!Shell_NotifyIcon(NIM_MODIFY, &nid))
+    {
+        Error(L"Shell_NotifyIcon failed!");
+    }
+}
 
 void UpdateTooltipText()
 {
@@ -19,13 +33,12 @@ void UpdateTooltipText()
     }
     else if (DelayRemainingM >= 0)
     {
-        int hours = (DelayRemainingM / 60);
-        int min = DelayRemainingM - ((DelayRemainingM / 60) * 60);
+        UINT days, hours, minutes;
+        DaysMinsSecsFromMinutes(DelayRemainingM, &days, &hours, &minutes);
 
         swprintf(nid.szTip, 128,
                  L"Keep Alive - Timer Running\n%i hr %i min remaining",
-                 (DelayRemainingM / 60),
-                 DelayRemainingM - ((DelayRemainingM / 60) * 60));
+                 hours, minutes);
     }
     else
     {
@@ -111,6 +124,7 @@ void TogglePaused()
 {
     paused = !paused;
 
+    UpdateTrayIcon();
     UpdateTooltipText();
 }
 
@@ -118,6 +132,8 @@ void Tick(bool LongTimer)
 {
     if (LongTimer) /* IDT_TIMER_LONG, fires every minute */
     {
+        TotalTimeRunningM++;
+
         if (DelayRemainingM == 0)
         {
             paused = true;
@@ -137,6 +153,7 @@ void Tick(bool LongTimer)
         }
     }
 
+    UpdateTrayIcon();
     UpdateTooltipText();
 }
 
