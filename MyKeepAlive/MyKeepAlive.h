@@ -16,16 +16,17 @@
 #define STRLEN(str) (int)wcslen(str)
 #define BUFSTR(buf) (LPWSTR)&buf
 
+// main.cpp
 extern HINSTANCE hInstance;
+void RightClickMenu(HWND hwndTray, POINT pt);
 
 // tray.cpp
 bool CreateTrayWindow();
+void UpdateIconAndTooltip();
 
 // preview.cpp
-extern bool PreviewShowing;
 bool CreatePreviewWindow();
-void ShowPreviewWindow();
-void HidePreviewWindow();
+void ShowHidePreview(bool show);
 
 // timer.cpp
 class CTimer
@@ -37,14 +38,15 @@ class CTimer
     void(*fnInject)();
 
 public:
-    CTimer(HWND hwnd, void(*_fnUpdateUI)(), void(*_fnInject)());
+    CTimer(void(*_fnUpdateUI)(), void(*_fnInject)());
+    void CreateTimers(HWND hwnd);
     void Callback(UINT id);
     void ToggleDelay();
     void TogglePaused();
 
     bool Paused() { return paused; }
     bool Delayed() { return DelayRemainingM <= 0; }
-    void DaysHrsMinDelayed(UINT* days, UINT* hrs, UINT* min);
+    void HrsMinDelayed(UINT* hrs, UINT* min);
     void DaysHrsMinTotal(UINT* days, UINT* hrs, UINT* min);
 };
 extern CTimer* gTimer;

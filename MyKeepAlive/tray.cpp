@@ -4,44 +4,31 @@
 using namespace std;
 
 NOTIFYICONDATA nid = {};
-HWND hwndTray = nullptr;
-const UINT nidID = 13542;
-
-void InjectBogusKeyboardInput()
+void UpdateShellIconInfo(DWORD msg)
 {
-    static INPUT i = { INPUT_KEYBOARD, { VK_F24, 0, 0, 0, 0 } };
-    SendInput(1, &i, sizeof(INPUT));
+    if (!Shell_NotifyIcon(msg, &nid))
+    {
+        Error(L"Shell_NotifyIcon failed!");
+    }
 }
 
 void UpdateIconAndTooltip()
 {
-    static bool pauseLast = false;
-    static bool delayLast = false;
-    static int delayMLast = -1; // always update on first call
-
     const bool paused = gTimer->Paused();
     const bool delayed = gTimer->Delayed();
-    UINT days, hours, minutes;
-    gTimer->DaysHrsMinDelayed(&days, &hours, &minutes);
-
-    // Return if there's nothing to do
-    if ((paused == pauseLast) ||
-        (delayed == delayLast) ||
-        ((int)minutes == delayMLast))
-    {
-        return;
-    }
+    UINT hours, minutes;
+    gTimer->HrsMinDelayed(&hours, &minutes);
 
     static HICON hIconOn = LoadIcon(hInstance,
         (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC_ACTIVE));
     static HICON hIconOff = LoadIcon(hInstance,
         (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC));
 
-    // Update the tray icon
-    nid.hIcon = (paused ? hIconOff : hIconOn);
-
     static LPCWSTR strTooltipPause = L"Keep Alive - Paused";
     static LPCWSTR strTooltipRunning = L"Keep Alive - Paused";
+
+    // Update the tray icon
+    nid.hIcon = (paused ? hIconOff : hIconOn);
 
     // Update the tooltip text
     if (paused || !delayed)
@@ -56,83 +43,7 @@ void UpdateIconAndTooltip()
     }
 
     // Send updates to shell
-    if (!Shell_NotifyIcon(NIM_MODIFY, &nid))
-    {
-        Error(L"Shell_NotifyIcon failed!");
-    }
-}
-
-void RightClickMenu()
-{
-    HMENU hMenu = CreatePopupMenu();
-
-    InsertMenu(hMenu, 0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_EXIT, L"Exit");
-
-    InsertMenu(hMenu, 0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_TOGGLEPAUSE, L"Pause");
-
-    CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
-        gTimer->Paused() ? MF_CHECKED : MF_UNCHECKED);
-
-    if (!gTimer->Paused())
-    {
-        WCHAR mnItemBuf[100];
-        if (gTimer->Delayed())
-        {
-            UINT days, hours, minutes;
-            gTimer->DaysHrsMinDelayed(&days, &hours, &minutes);
-
-            swprintf(BUFSTR(mnItemBuf), 100,
-                L"Pause in %i hr %i min", hours, minutes);
-        }
-        else
-        {
-            swprintf(BUFSTR(mnItemBuf), 100, L"Pause in 5 hours");
-        }
-
-        InsertMenu(hMenu, 0xFFFFFFFF,
-            MF_BYPOSITION | MF_STRING,
-            IDM_TOGGLE5HRDELAY, BUFSTR(mnItemBuf));
-
-        CheckMenuItem(hMenu, IDM_TOGGLE5HRDELAY,
-            gTimer->Delayed() ? MF_CHECKED : MF_UNCHECKED);
-    }
-
-    POINT pt;
-    GetCursorPos(&pt);
-    POINT ptMenu = KeepPointInRect(pt, WorkAreaFromPoint(pt));
-    WellBehavedTrackPopup(hwndTray, hMenu, ptMenu);
-}
-
-bool SetUpTrayWindow(HWND hwnd)
-{
-    hwndTray = hwnd;
-
-    // Register the window with the shell
-    nid.cbSize = sizeof(NOTIFYICONDATA);
-    nid.hWnd = hwnd;
-    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_SHOWTIP | NIF_TIP;
-    nid.uCallbackMessage = WM_USER_SHELLICON;
-    nid.uID = nidID;
-    if (!Shell_NotifyIcon(NIM_ADD, &nid))
-    {
-        Error(L"Shell_NotifyIcon failed!");
-        return false;
-    }
-
-    // Create the timer
-    gTimer = new CTimer(hwnd, UpdateIconAndTooltip, InjectBogusKeyboardInput);
-    if (gTimer == nullptr)
-    {
-        Error(L"Couldn't create CTimer!");
-        return false;
-    }
-
-    UpdateIconAndTooltip();
-    return true;
+    UpdateShellIconInfo(NIM_MODIFY);
 }
 
 LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -140,10 +51,19 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
     switch (message)
     {
     case WM_CREATE:
-        if (!SetUpTrayWindow(hwnd))
-        {
-            return -1;
-        }
+        // Register the timers
+        gTimer->CreateTimers(hwnd);
+
+        // Register the Notify Icon
+        nid.cbSize = sizeof(NOTIFYICONDATA);
+        nid.hWnd = hwnd;
+        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_SHOWTIP | NIF_TIP;
+        nid.uCallbackMessage = WM_USER_SHELLICON;
+        nid.uID = 13542; // not sure what this is...
+        UpdateShellIconInfo(NIM_ADD);
+
+        // Set initial icon and tooltip text
+        UpdateIconAndTooltip();
         break;
 
     case WM_TIMER:
@@ -157,11 +77,14 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         case WM_LBUTTONDOWN:
             if (LOWORD(lParam) == WM_RBUTTONDOWN)
             {
-                RightClickMenu();
+                POINT pt;
+                GetCursorPos(&pt);
+                pt = KeepPointInRect(pt, WorkAreaFromPoint(pt));
+                RightClickMenu(hwnd, pt);
             }
             else
             {
-                ShowPreviewWindow();
+                ShowHidePreview(true);
             }
             break;
         }

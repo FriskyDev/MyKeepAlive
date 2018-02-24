@@ -125,26 +125,30 @@ void Draw(HDC hdc, HWND hwnd)
         &rc, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
 }
 
-void ShowPreviewWindow()
+void ShowHidePreview(bool show)
 {
-    POINT pt;
-    GetCursorPos(&pt);
-    dpi = DpiFromPt(pt);
+    if (show)
+    {
+        POINT pt;
+        GetCursorPos(&pt);
+        dpi = DpiFromPt(pt);
 
-    SIZE sz = { DPISCALE(PreviewSize.cx), DPISCALE(PreviewSize.cy) };
-    RECT rc = { pt.x, pt.y, pt.x + sz.cx, pt.y + sz.cy };
-    rc = KeepRectInRect(rc, WorkAreaFromPoint(pt));
-    SetWindowPos(hwndPreview, nullptr,
-        rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
-        SWP_SHOWWINDOW);
+        RECT rc = { pt.x, pt.y,
+            pt.x + DPISCALE(PreviewSize.cx),
+            pt.y + DPISCALE(PreviewSize.cy) };
+        rc = KeepRectInRect(rc, WorkAreaFromPoint(pt));
+        SetWindowPos(hwndPreview, nullptr,
+            rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
+            SWP_SHOWWINDOW);
 
-    SetForegroundWindow(hwndPreview);
-}
+        SetForegroundWindow(hwndPreview);
+    }
+    else
+    {
+        SetWindowPos(hwndPreview, nullptr, 0, 0, 0, 0,
+            SWP_HIDEWINDOW | SWP_NOMOVE | SWP_NOSIZE);
+    }
 
-void HidePreviewWindow()
-{
-    SetWindowPos(hwndPreview, nullptr, 0, 0, 0, 0,
-        SWP_HIDEWINDOW | SWP_NOMOVE | SWP_NOSIZE);
 }
 
 LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -178,7 +182,7 @@ LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM l
     case WM_ACTIVATE:
         if (wParam == WA_INACTIVE)
         {
-            HidePreviewWindow();
+            ShowHidePreview(false);
         }
         break;
     }

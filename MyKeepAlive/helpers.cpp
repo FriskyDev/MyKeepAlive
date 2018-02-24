@@ -65,25 +65,6 @@ void WellBehavedTrackPopup(HWND hwnd, HMENU hMenu, POINT pt)
     PostMessage(hwnd, WM_NULL, 0, 0);
 }
 
-UINT GetDpiForWindow(HWND hwnd)
-{
-    typedef UINT(WINAPI *fnGetDpiForWindow)(HWND);
-    static fnGetDpiForWindow pfn = nullptr;
-
-    if (!pfn)
-    {
-        HMODULE hModUser32 = GetModuleHandle(_T("user32.dll"));
-        pfn = (fnGetDpiForWindow)GetProcAddress(hModUser32, "GetDpiForWindow");
-        if (!pfn)
-        {
-            Error(L"Can't find GetDpiForWindow!");
-            return 96;
-        }
-    }
-
-    return pfn(hwnd);
-}
-
 void DaysMinsSecsFromMinutes(
     _In_ UINT minutes,
     _Out_ UINT* days,

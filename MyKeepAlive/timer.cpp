@@ -9,11 +9,11 @@ using namespace std;
 const UINT TimerMS = 10000;          // 10 seconds
 const UINT LongTimerMS = 60000;      // 1 minute
 const UINT DelayTimeoutM = 60 * 5;   // 5 hours
-CTimer* gTimer = nullptr;
 
-void CTimer::DaysHrsMinDelayed(UINT* days, UINT* hrs, UINT* min)
+void CTimer::HrsMinDelayed(UINT* hrs, UINT* min)
 {
-    DaysMinsSecsFromMinutes(DelayRemainingM, days, hrs, min);
+    UINT days;
+    DaysMinsSecsFromMinutes(DelayRemainingM, &days, hrs, min);
 }
 
 void CTimer::DaysHrsMinTotal(UINT* days, UINT* hrs, UINT* min)
@@ -68,9 +68,14 @@ void CTimer::Callback(UINT id)
     fnUpdateUI();
 }
 
-CTimer::CTimer(HWND hwnd, void(*_fnUpdateUI)(), void(*_fnInject)())
-    : fnUpdateUI(_fnUpdateUI), fnInject(_fnInject)
+void CTimer::CreateTimers(HWND hwnd)
 {
     SetTimer(hwnd, IDT_TIMER, TimerMS, nullptr);
     SetTimer(hwnd, IDT_TIMER_LONG, LongTimerMS, nullptr);
+}
+
+CTimer::CTimer(void(*_fnUpdateUI)(), void(*_fnInject)())
+    : fnUpdateUI(_fnUpdateUI), fnInject(_fnInject)
+{
+
 }
