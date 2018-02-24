@@ -172,6 +172,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="preview.cpp" />
+    <ClCompile Include="timer.cpp" />
     <ClCompile Include="tray.cpp" />
   </ItemGroup>
   <ItemGroup>

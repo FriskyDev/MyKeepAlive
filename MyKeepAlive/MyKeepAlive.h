@@ -8,8 +8,6 @@
 #include <string>
 #include "resource.h"
 
-#define IDT_TIMER           101
-#define IDT_TIMER_LONG      102
 #define IDM_EXIT            111
 #define IDM_TOGGLEPAUSE     112
 #define IDM_TOGGLE5HRDELAY  113
@@ -18,22 +16,38 @@
 #define STRLEN(str) (int)wcslen(str)
 #define BUFSTR(buf) (LPWSTR)&buf
 
-// main.cpp
 extern HINSTANCE hInstance;
-extern bool paused;
 
 // tray.cpp
-extern int TotalTimeRunningM;
-extern int DelayRemainingM;
 bool CreateTrayWindow();
-void TogglePaused();
 
 // preview.cpp
 extern bool PreviewShowing;
-extern HWND hwndPreview;
 bool CreatePreviewWindow();
 void ShowPreviewWindow();
 void HidePreviewWindow();
+
+// timer.cpp
+class CTimer
+{
+    bool paused = true;
+    int TotalTimeRunningM = 0;
+    int DelayRemainingM = 0;
+    void(*fnUpdateUI)();
+    void(*fnInject)();
+
+public:
+    CTimer(HWND hwnd, void(*_fnUpdateUI)(), void(*_fnInject)());
+    void Callback(UINT id);
+    void ToggleDelay();
+    void TogglePaused();
+
+    bool Paused() { return paused; }
+    bool Delayed() { return DelayRemainingM <= 0; }
+    void DaysHrsMinDelayed(UINT* days, UINT* hrs, UINT* min);
+    void DaysHrsMinTotal(UINT* days, UINT* hrs, UINT* min);
+};
+extern CTimer* gTimer;
 
 // helpers.cpp
 void Error(std::wstring msg);

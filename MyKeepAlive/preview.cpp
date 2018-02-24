@@ -11,66 +11,57 @@ const int FontSize = 20;
 const int FontSizeSm = 15;
 
 HWND hwndPreview = nullptr;
-bool PreviewShowing = false;
 RECT rcTogglePause = {};
 
 UINT dpi = 96;
 #define DPISCALE(val) MulDiv(val, dpi, 96)
 
-void GetFontsFromCache(UINT dpi, _Out_ HFONT* hfont, _Out_ HFONT* hfontSm)
+HFONT hfont = nullptr;
+HFONT hfontSm = nullptr;
+
+void RefreshFontsForDpi(UINT dpi)
 {
     static UINT dpiLast = 0;
-    static HFONT hfontLast = nullptr;
-    static HFONT hfontSmLast = nullptr;
-
-    // Load fonts once for each DPI, throwing out the previously created fonts
     if (dpiLast != dpi)
     {
         dpiLast = dpi;
 
-        if (hfontLast != nullptr)
+        if (hfont != nullptr)
         {
-            DeleteFont(hfontLast);
+            DeleteFont(hfont);
         }
 
-        hfontLast = CreateFont(
+        hfont = CreateFont(
             DPISCALE(FontSize),
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             FontName);
 
-        if (hfontSmLast != nullptr)
+        if (hfontSm != nullptr)
         {
-            DeleteFont(hfontSmLast);
+            DeleteFont(hfontSm);
         }
 
-        hfontSmLast = CreateFont(
+        hfontSm = CreateFont(
             DPISCALE(FontSizeSm),
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             FontName);
     }
 
-    // We expect creating fonts to always succeed
     if (hfont == nullptr || hfontSm == nullptr)
     {
         Error(L"Draw preview window failed to create fonts.");
     }
-
-    *hfont = hfontLast;
-    *hfontSm = hfontSmLast;
 }
 
 void Draw(HDC hdc, HWND hwnd)
 {
-    // Get/ create fonts for the current dpi
-    HFONT hfont, hfontSm;
-    GetFontsFromCache(dpi, &hfont, &hfontSm);
-
-    // Do text stuff
     SetBkMode(hdc, TRANSPARENT);
-
-    // Fill background color
+    RefreshFontsForDpi(dpi);
+    
     static HBRUSH hbrActive = CreateSolidBrush(rgbBackground);
     static HBRUSH hbrInactive = CreateSolidBrush(rgbBackgroundPaused);
+
+    bool paused = gTimer->Paused();
 
     RECT rc;
     GetClientRect(hwnd, &rc);
@@ -109,75 +100,51 @@ void Draw(HDC hdc, HWND hwnd)
     DrawText(hdc, BUFSTR(StatusBuf), STRLEN(BUFSTR(StatusBuf)), &rc, DT_LEFT);
     rc.top += DPISCALE(10);
 
-    if (TotalTimeRunningM > 0)
+    UINT days, hours, minutes;
+    gTimer->DaysHrsMinTotal(&days, &hours, &minutes);
+
+    WCHAR TotalTimeBuf[100];
+    if (days > 0)
     {
-        UINT days, hours, minutes;
-        DaysMinsSecsFromMinutes(TotalTimeRunningM, &days, &hours, &minutes);
-
-        WCHAR TotalTimeBuf[100];
-        if (days > 0)
-        {
-            swprintf(BUFSTR(TotalTimeBuf), 100,
-                L"%i days, %i hours, %i min",
-                days, hours, minutes);
-        }
-        else if (hours > 0)
-        {
-            swprintf(BUFSTR(TotalTimeBuf), 100,
-                L"%i hours, %i min", hours, minutes);
-        }
-        else
-        {
-            swprintf(BUFSTR(TotalTimeBuf), 100,
-                L"%i min", minutes);
-        }
-
-        DrawText(hdc, BUFSTR(TotalTimeBuf), STRLEN(BUFSTR(TotalTimeBuf)),
-            &rc, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
+        swprintf(BUFSTR(TotalTimeBuf), 100,
+            L"%i days, %i hours, %i min",
+            days, hours, minutes);
     }
+    else if (hours > 0)
+    {
+        swprintf(BUFSTR(TotalTimeBuf), 100,
+            L"%i hours, %i min", hours, minutes);
+    }
+    else
+    {
+        swprintf(BUFSTR(TotalTimeBuf), 100,
+            L"%i min", minutes);
+    }
+
+    DrawText(hdc, BUFSTR(TotalTimeBuf), STRLEN(BUFSTR(TotalTimeBuf)),
+        &rc, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
 }
 
 void ShowPreviewWindow()
 {
-    if (PreviewShowing)
-    {
-        return;
-    }
-
-    // When opened, will be positioned near the cursor
-    // todo: can i get the position of the icon itself?
     POINT pt;
     GetCursorPos(&pt);
-
-    // From the anchor point, set dpi (the scale factor for our monitor)
     dpi = DpiFromPt(pt);
 
-    // Find the size, and then the final position (the anchor point, extended
-    // by size, strictly within the work area).
     SIZE sz = { DPISCALE(PreviewSize.cx), DPISCALE(PreviewSize.cy) };
     RECT rc = { pt.x, pt.y, pt.x + sz.cx, pt.y + sz.cy };
     rc = KeepRectInRect(rc, WorkAreaFromPoint(pt));
-
-    // Position and show window
     SetWindowPos(hwndPreview, nullptr,
         rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
         SWP_SHOWWINDOW);
 
-    // Give window foreground to ensure we get a de-activate (to know when to hide)
     SetForegroundWindow(hwndPreview);
-
-    PreviewShowing = true;
 }
 
 void HidePreviewWindow()
 {
-    if (PreviewShowing)
-    {
-        SetWindowPos(hwndPreview, nullptr, 0, 0, 0, 0,
-            SWP_HIDEWINDOW | SWP_NOMOVE | SWP_NOSIZE);
-
-        PreviewShowing = false;
-    }
+    SetWindowPos(hwndPreview, nullptr, 0, 0, 0, 0,
+        SWP_HIDEWINDOW | SWP_NOMOVE | SWP_NOSIZE);
 }
 
 LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -202,7 +169,7 @@ LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM l
         POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
         if (PtInRect(&rcTogglePause, pt))
         {
-            TogglePaused();
+            gTimer->TogglePaused();
             InvalidateRect(hwnd, nullptr, true);
         }
         break;

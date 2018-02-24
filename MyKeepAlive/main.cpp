@@ -4,7 +4,6 @@
 using namespace std;
 
 HINSTANCE hInstance = nullptr;
-bool paused = true; // start in the in-active state
 
 int APIENTRY wWinMain(_In_ HINSTANCE _hInstance,
                       _In_opt_ HINSTANCE,

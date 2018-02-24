@@ -3,199 +3,136 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
-const UINT TimerMS = 10000;          // 10 seconds
-const UINT LongTimerMS = 60000;      // 1 minute
-const UINT DelayTimeoutM = 60 * 5;   // 5 hours
-
 NOTIFYICONDATA nid = {};
 HWND hwndTray = nullptr;
-int DelayRemainingM = -1;
-int TotalTimeRunningM = 0;
+const UINT nidID = 13542;
 
-void UpdateTrayIcon()
+void InjectBogusKeyboardInput()
 {
-    // Called when paused changes, update tray icon
+    static INPUT i = { INPUT_KEYBOARD, { VK_F24, 0, 0, 0, 0 } };
+    SendInput(1, &i, sizeof(INPUT));
+}
 
-    nid.hIcon = LoadIcon(hInstance,
-        (LPCTSTR)MAKEINTRESOURCE(paused ? IDI_HANDPIC : IDI_HANDPIC_ACTIVE));
+void UpdateIconAndTooltip()
+{
+    static bool pauseLast = false;
+    static bool delayLast = false;
+    static int delayMLast = -1; // always update on first call
 
+    const bool paused = gTimer->Paused();
+    const bool delayed = gTimer->Delayed();
+    UINT days, hours, minutes;
+    gTimer->DaysHrsMinDelayed(&days, &hours, &minutes);
+
+    // Return if there's nothing to do
+    if ((paused == pauseLast) ||
+        (delayed == delayLast) ||
+        ((int)minutes == delayMLast))
+    {
+        return;
+    }
+
+    static HICON hIconOn = LoadIcon(hInstance,
+        (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC_ACTIVE));
+    static HICON hIconOff = LoadIcon(hInstance,
+        (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC));
+
+    // Update the tray icon
+    nid.hIcon = (paused ? hIconOff : hIconOn);
+
+    static LPCWSTR strTooltipPause = L"Keep Alive - Paused";
+    static LPCWSTR strTooltipRunning = L"Keep Alive - Paused";
+
+    // Update the tooltip text
+    if (paused || !delayed)
+    {
+        wcscpy_s(nid.szTip, paused ? strTooltipPause : strTooltipRunning);
+    }
+    else
+    {
+        swprintf(nid.szTip, 128,
+            L"Keep Alive - Timer Running\n%i hr %i min remaining",
+            hours, minutes);
+    }
+
+    // Send updates to shell
     if (!Shell_NotifyIcon(NIM_MODIFY, &nid))
     {
         Error(L"Shell_NotifyIcon failed!");
     }
 }
 
-void UpdateTooltipText()
+void RightClickMenu()
 {
-    // Called when active/ delay state changes, update tooltip (hover bubble) text
+    HMENU hMenu = CreatePopupMenu();
 
-    if (paused)
+    InsertMenu(hMenu, 0xFFFFFFFF,
+        MF_BYPOSITION | MF_STRING,
+        IDM_EXIT, L"Exit");
+
+    InsertMenu(hMenu, 0xFFFFFFFF,
+        MF_BYPOSITION | MF_STRING,
+        IDM_TOGGLEPAUSE, L"Pause");
+
+    CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
+        gTimer->Paused() ? MF_CHECKED : MF_UNCHECKED);
+
+    if (!gTimer->Paused())
     {
-        wcscpy_s(nid.szTip, L"Keep Alive - Paused");
-    }
-    else if (DelayRemainingM >= 0)
-    {
-        UINT days, hours, minutes;
-        DaysMinsSecsFromMinutes(DelayRemainingM, &days, &hours, &minutes);
+        WCHAR mnItemBuf[100];
+        if (gTimer->Delayed())
+        {
+            UINT days, hours, minutes;
+            gTimer->DaysHrsMinDelayed(&days, &hours, &minutes);
 
-        swprintf(nid.szTip, 128,
-                 L"Keep Alive - Timer Running\n%i hr %i min remaining",
-                 hours, minutes);
-    }
-    else
-    {
-        wcscpy_s(nid.szTip, L"Keep Alive - Running");
-    }
+            swprintf(BUFSTR(mnItemBuf), 100,
+                L"Pause in %i hr %i min", hours, minutes);
+        }
+        else
+        {
+            swprintf(BUFSTR(mnItemBuf), 100, L"Pause in 5 hours");
+        }
 
-    if (!Shell_NotifyIcon(NIM_MODIFY, &nid))
-    {
-        Error(L"Setting tooltip text failed! - Shell_NotifyIcon(MODIFY)");
-    }
-}
-
-void Click(bool rightClick)
-{
-    if (rightClick)
-    {
-        // Right click creates an on-the-fly menu and shows it near the cursor
-
-        HMENU hMenu = CreatePopupMenu();
-
-        // Add the exit option
         InsertMenu(hMenu, 0xFFFFFFFF,
             MF_BYPOSITION | MF_STRING,
-            IDM_EXIT, L"Exit");
+            IDM_TOGGLE5HRDELAY, BUFSTR(mnItemBuf));
 
-        // Add the pause option and 'check' it if we're paused
-        InsertMenu(hMenu, 0xFFFFFFFF,
-            MF_BYPOSITION | MF_STRING,
-            IDM_TOGGLEPAUSE, L"Pause");
-
-        CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
-            paused ? MF_CHECKED : MF_UNCHECKED);
-
-        if (!paused)
-        {
-            // Add the 'delay pause' button (if not paused), and check if there's a delay
-
-            bool delayset = (DelayRemainingM >= 0);
-
-            WCHAR mnItemBuf[100];
-            if (delayset)
-            {
-                UINT days, hours, minutes;
-                DaysMinsSecsFromMinutes(DelayRemainingM, &days, &hours, &minutes);
-
-                swprintf(BUFSTR(mnItemBuf), 100,
-                    L"Pause in %i hr %i min", hours, minutes);
-            }
-            else
-            {
-                swprintf(BUFSTR(mnItemBuf), 100, L"Pause in 5 hours");
-            }
-
-            InsertMenu(hMenu, 0xFFFFFFFF,
-                MF_BYPOSITION | MF_STRING,
-                IDM_TOGGLE5HRDELAY, BUFSTR(mnItemBuf));
-
-            CheckMenuItem(hMenu, IDM_TOGGLE5HRDELAY,
-                delayset ? MF_CHECKED : MF_UNCHECKED);
-        }
-
-        // Open the menu at the cursor pos, but within the work area
-        POINT pt;
-        GetCursorPos(&pt);
-        POINT ptMenu = KeepPointInRect(pt, WorkAreaFromPoint(pt));
-        WellBehavedTrackPopup(hwndTray, hMenu, ptMenu);
+        CheckMenuItem(hMenu, IDM_TOGGLE5HRDELAY,
+            gTimer->Delayed() ? MF_CHECKED : MF_UNCHECKED);
     }
-    else
-    {
-        // Left click shows the preview window
-        ShowPreviewWindow();
-    }
+
+    POINT pt;
+    GetCursorPos(&pt);
+    POINT ptMenu = KeepPointInRect(pt, WorkAreaFromPoint(pt));
+    WellBehavedTrackPopup(hwndTray, hMenu, ptMenu);
 }
 
-void Toggle5HrDelay()
-{
-    if (DelayRemainingM < 0)
-    {
-        DelayRemainingM = DelayTimeoutM;
-    }
-    else
-    {
-        DelayRemainingM = -1;
-    }
-
-    UpdateTooltipText();
-}
-
-void TogglePaused()
-{
-    paused = !paused;
-
-    UpdateTrayIcon();
-    UpdateTooltipText();
-}
-
-void Tick(bool LongTimer)
-{
-    if (LongTimer) /* IDT_TIMER_LONG, fires every minute */
-    {
-        TotalTimeRunningM++;
-
-        if (DelayRemainingM == 0)
-        {
-            paused = true;
-        }
-        else if (DelayRemainingM > 0)
-        {
-            DelayRemainingM--;
-        }
-    }
-    else /* IDT_TIMER, fires every ten seconds */
-    {
-        if (!paused)
-        {
-            // Inject bogus keyboard input
-            static INPUT i = { INPUT_KEYBOARD,{ VK_F24, 0, 0, 0, 0 } };
-            SendInput(1, &i, sizeof(INPUT));
-        }
-    }
-
-    UpdateTrayIcon();
-    UpdateTooltipText();
-}
-
-bool InitTrayWindow(HWND hwnd)
+bool SetUpTrayWindow(HWND hwnd)
 {
     hwndTray = hwnd;
-    SetTimer(hwnd, IDT_TIMER, TimerMS, nullptr);
-    SetTimer(hwnd, IDT_TIMER_LONG, LongTimerMS, nullptr);
 
+    // Register the window with the shell
     nid.cbSize = sizeof(NOTIFYICONDATA);
     nid.hWnd = hwnd;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_SHOWTIP | NIF_TIP;
     nid.uCallbackMessage = WM_USER_SHELLICON;
-    nid.uID = 13542; // each tray icon declares a unique id? weird.
-
+    nid.uID = nidID;
     if (!Shell_NotifyIcon(NIM_ADD, &nid))
     {
         Error(L"Shell_NotifyIcon failed!");
         return false;
     }
 
-    UpdateTooltipText();
-    UpdateTrayIcon();
+    // Create the timer
+    gTimer = new CTimer(hwnd, UpdateIconAndTooltip, InjectBogusKeyboardInput);
+    if (gTimer == nullptr)
+    {
+        Error(L"Couldn't create CTimer!");
+        return false;
+    }
+
+    UpdateIconAndTooltip();
     return true;
-}
-
-void OnExit()
-{
-    // Tray closing, deregister, destroy preview window, exit message loop.
-
-    Shell_NotifyIcon(NIM_DELETE, &nid);
-    DestroyWindow(hwndPreview);
-    PostQuitMessage(0);
 }
 
 LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -203,14 +140,14 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
     switch (message)
     {
     case WM_CREATE:
-        if (!InitTrayWindow(hwnd))
+        if (!SetUpTrayWindow(hwnd))
         {
             return -1;
         }
         break;
 
     case WM_TIMER:
-        Tick(LOWORD(wParam) == IDT_TIMER_LONG);
+        gTimer->Callback(LOWORD(wParam));
         break;
 
     case WM_USER_SHELLICON:
@@ -218,7 +155,14 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         {
         case WM_RBUTTONDOWN:
         case WM_LBUTTONDOWN:
-            Click(LOWORD(lParam) == WM_RBUTTONDOWN);
+            if (LOWORD(lParam) == WM_RBUTTONDOWN)
+            {
+                RightClickMenu();
+            }
+            else
+            {
+                ShowPreviewWindow();
+            }
             break;
         }
         break;
@@ -227,15 +171,18 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         switch (LOWORD(wParam))
         {
         case IDM_EXIT:
-            OnExit();
+            delete gTimer;
+            Shell_NotifyIcon(NIM_DELETE, &nid);
+            PostQuitMessage(0);
             break;
 
         case IDM_TOGGLEPAUSE:
-            TogglePaused();
+            gTimer->TogglePaused();
             break;
 
         case IDM_TOGGLE5HRDELAY:
-            Toggle5HrDelay();
+            gTimer->ToggleDelay();
+            break;
         }
         break;
     }
