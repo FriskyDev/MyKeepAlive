@@ -11,13 +11,11 @@ const int FontSize = 20;
 const int FontSizeSm = 15;
 
 HWND hwndPreview = nullptr;
-RECT rcTogglePause = {};
-
 UINT dpi = 96;
-#define DPISCALE(val) MulDiv(val, dpi, 96)
-
 HFONT hfont = nullptr;
 HFONT hfontSm = nullptr;
+
+#define DPISCALE(val) MulDiv(val, dpi, 96)
 
 void RefreshFontsForDpi(UINT dpi)
 {
@@ -77,14 +75,6 @@ void Draw(HDC hdc, HWND hwnd)
     DrawText(hdc, szSubHeader, STRLEN(szSubHeader), &rc, DT_LEFT);
     rc.top += 2 * DPISCALE(FontSizeSm) + DPISCALE(10);
 
-    const int buttonsize = DPISCALE(25);
-    const int buf = DPISCALE(5);
-    rcTogglePause = { rc.left, rc.top,
-                      rc.left + buttonsize + buf,
-                      rc.top + buttonsize + buf };
-    FillRect(hdc, &rcTogglePause, Paused() ? hbrActive : hbrInactive);
-    rc.left += buttonsize + (2 * buf);
-    
     WCHAR StatusBuf[100];
     if (Paused())
     {
@@ -167,15 +157,9 @@ LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM l
     }
 
     case WM_LBUTTONDOWN:
-    {
-        POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
-        if (PtInRect(&rcTogglePause, pt))
-        {
-            TogglePaused();
-            InvalidateRect(hwnd, nullptr, true);
-        }
+        TogglePaused();
+        InvalidateRect(hwnd, nullptr, true);
         break;
-    }
 
     case WM_ACTIVATE:
         if (wParam == WA_INACTIVE)
