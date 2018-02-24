@@ -14,10 +14,10 @@ void UpdateShellIconInfo(DWORD msg)
 
 void UpdateIconAndTooltip()
 {
-    const bool paused = gTimer->Paused();
-    const bool delayed = gTimer->Delayed();
+    const bool paused = Paused();
+    const bool delayed = Delayed();
     UINT hours, minutes;
-    gTimer->HrsMinDelayed(&hours, &minutes);
+    HrsMinDelayed(&hours, &minutes);
 
     static HICON hIconOn = LoadIcon(hInstance,
         (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC_ACTIVE));
@@ -52,7 +52,7 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
     {
     case WM_CREATE:
         // Register the timers
-        gTimer->CreateTimers(hwnd);
+        CreateTimers(hwnd);
 
         // Register the Notify Icon
         nid.cbSize = sizeof(NOTIFYICONDATA);
@@ -67,7 +67,7 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         break;
 
     case WM_TIMER:
-        gTimer->Callback(LOWORD(wParam));
+        Callback(LOWORD(wParam));
         break;
 
     case WM_USER_SHELLICON:
@@ -94,17 +94,16 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         switch (LOWORD(wParam))
         {
         case IDM_EXIT:
-            delete gTimer;
             Shell_NotifyIcon(NIM_DELETE, &nid);
             PostQuitMessage(0);
             break;
 
         case IDM_TOGGLEPAUSE:
-            gTimer->TogglePaused();
+            TogglePaused();
             break;
 
         case IDM_TOGGLE5HRDELAY:
-            gTimer->ToggleDelay();
+            ToggleDelay();
             break;
         }
         break;

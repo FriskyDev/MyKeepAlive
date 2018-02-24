@@ -61,11 +61,9 @@ void Draw(HDC hdc, HWND hwnd)
     static HBRUSH hbrActive = CreateSolidBrush(rgbBackground);
     static HBRUSH hbrInactive = CreateSolidBrush(rgbBackgroundPaused);
 
-    bool paused = gTimer->Paused();
-
     RECT rc;
     GetClientRect(hwnd, &rc);
-    FillRect(hdc, &rc, paused ? hbrInactive : hbrActive);
+    FillRect(hdc, &rc, Paused() ? hbrInactive : hbrActive);
 
     InflateRect(&rc, DPISCALE(-10) , DPISCALE(-10));
 
@@ -84,11 +82,11 @@ void Draw(HDC hdc, HWND hwnd)
     rcTogglePause = { rc.left, rc.top,
                       rc.left + buttonsize + buf,
                       rc.top + buttonsize + buf };
-    FillRect(hdc, &rcTogglePause, paused ? hbrActive : hbrInactive);
+    FillRect(hdc, &rcTogglePause, Paused() ? hbrActive : hbrInactive);
     rc.left += buttonsize + (2 * buf);
     
     WCHAR StatusBuf[100];
-    if (paused)
+    if (Paused())
     {
         swprintf(BUFSTR(StatusBuf), 100, L"Status: Inactive\n(NOT injecting input)");
     }
@@ -101,7 +99,7 @@ void Draw(HDC hdc, HWND hwnd)
     rc.top += DPISCALE(10);
 
     UINT days, hours, minutes;
-    gTimer->DaysHrsMinTotal(&days, &hours, &minutes);
+    DaysHrsMinTotal(&days, &hours, &minutes);
 
     WCHAR TotalTimeBuf[100];
     if (days > 0)
@@ -173,7 +171,7 @@ LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM l
         POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
         if (PtInRect(&rcTogglePause, pt))
         {
-            gTimer->TogglePaused();
+            TogglePaused();
             InvalidateRect(hwnd, nullptr, true);
         }
         break;

@@ -18,6 +18,7 @@
 
 // main.cpp
 extern HINSTANCE hInstance;
+void InjectBogusKeyboardInput();
 void RightClickMenu(HWND hwndTray, POINT pt);
 
 // tray.cpp
@@ -29,31 +30,18 @@ bool CreatePreviewWindow();
 void ShowHidePreview(bool show);
 
 // timer.cpp
-class CTimer
-{
-    bool paused = true;
-    int TotalTimeRunningM = 0;
-    int DelayRemainingM = 0;
-    void(*fnUpdateUI)();
-    void(*fnInject)();
+void CreateTimers(HWND hwnd);
+bool Delayed();
+bool Paused();
 
-public:
-    CTimer(void(*_fnUpdateUI)(), void(*_fnInject)());
-    void CreateTimers(HWND hwnd);
-    void Callback(UINT id);
-    void ToggleDelay();
-    void TogglePaused();
-
-    bool Paused() { return paused; }
-    bool Delayed() { return DelayRemainingM <= 0; }
-    void HrsMinDelayed(UINT* hrs, UINT* min);
-    void DaysHrsMinTotal(UINT* days, UINT* hrs, UINT* min);
-};
-extern CTimer* gTimer;
+void Callback(UINT id);
+void ToggleDelay();
+void TogglePaused();
+void HrsMinDelayed(UINT* hrs, UINT* min);
+void DaysHrsMinTotal(UINT* days, UINT* hrs, UINT* min);
 
 // helpers.cpp
 void Error(std::wstring msg);
-UINT GetDpiForWindow(HWND hwnd);
 void WellBehavedTrackPopup(HWND hwnd, HMENU hMenu, POINT pt);
 RECT KeepRectInRect(RECT rcStartRect, RECT rc);
 POINT KeepPointInRect(POINT pt, RECT rc);

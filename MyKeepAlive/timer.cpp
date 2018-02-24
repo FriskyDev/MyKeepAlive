@@ -10,18 +10,32 @@ const UINT TimerMS = 10000;          // 10 seconds
 const UINT LongTimerMS = 60000;      // 1 minute
 const UINT DelayTimeoutM = 60 * 5;   // 5 hours
 
-void CTimer::HrsMinDelayed(UINT* hrs, UINT* min)
+bool paused = true;
+int TotalTimeRunningM = 0;
+int DelayRemainingM = 0;
+
+bool Paused()
+{
+    return paused;
+}
+
+bool Delayed()
+{
+    return DelayRemainingM <= 0;
+}
+
+void HrsMinDelayed(UINT* hrs, UINT* min)
 {
     UINT days;
     DaysMinsSecsFromMinutes(DelayRemainingM, &days, hrs, min);
 }
 
-void CTimer::DaysHrsMinTotal(UINT* days, UINT* hrs, UINT* min)
+void DaysHrsMinTotal(UINT* days, UINT* hrs, UINT* min)
 {
     DaysMinsSecsFromMinutes(TotalTimeRunningM, days, hrs, min);
 }
 
-void CTimer::ToggleDelay()
+void ToggleDelay()
 {
     if (DelayRemainingM < 0)
     {
@@ -32,17 +46,17 @@ void CTimer::ToggleDelay()
         DelayRemainingM = -1;
     }
 
-    fnUpdateUI();
+    UpdateIconAndTooltip();
 }
 
-void CTimer::TogglePaused()
+void TogglePaused()
 {
     paused = !paused;
 
-    fnUpdateUI();
+    UpdateIconAndTooltip();
 }
 
-void CTimer::Callback(UINT id)
+void Callback(UINT id)
 {
     if (id == IDT_TIMER_LONG) /* fires every minute */
     {
@@ -61,21 +75,15 @@ void CTimer::Callback(UINT id)
     {
         if (!paused)
         {
-            fnInject();
+            InjectBogusKeyboardInput();
         }
     }
 
-    fnUpdateUI();
+    UpdateIconAndTooltip();
 }
 
-void CTimer::CreateTimers(HWND hwnd)
+void CreateTimers(HWND hwnd)
 {
     SetTimer(hwnd, IDT_TIMER, TimerMS, nullptr);
     SetTimer(hwnd, IDT_TIMER_LONG, LongTimerMS, nullptr);
-}
-
-CTimer::CTimer(void(*_fnUpdateUI)(), void(*_fnInject)())
-    : fnUpdateUI(_fnUpdateUI), fnInject(_fnInject)
-{
-
 }

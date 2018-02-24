@@ -4,7 +4,6 @@
 using namespace std;
 
 HINSTANCE hInstance = nullptr;
-CTimer* gTimer = nullptr;
 
 void InjectBogusKeyboardInput()
 {
@@ -25,15 +24,15 @@ void RightClickMenu(HWND hwnd, POINT pt)
         IDM_TOGGLEPAUSE, L"Pause");
 
     CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
-        gTimer->Paused() ? MF_CHECKED : MF_UNCHECKED);
+        Paused() ? MF_CHECKED : MF_UNCHECKED);
 
-    if (!gTimer->Paused())
+    if (!Paused())
     {
         WCHAR mnItemBuf[100];
-        if (gTimer->Delayed())
+        if (Delayed())
         {
             UINT hours, minutes;
-            gTimer->HrsMinDelayed(&hours, &minutes);
+            HrsMinDelayed(&hours, &minutes);
 
             swprintf(BUFSTR(mnItemBuf), 100,
                 L"Pause in %i hr %i min", hours, minutes);
@@ -48,7 +47,7 @@ void RightClickMenu(HWND hwnd, POINT pt)
             IDM_TOGGLE5HRDELAY, BUFSTR(mnItemBuf));
 
         CheckMenuItem(hMenu, IDM_TOGGLE5HRDELAY,
-            gTimer->Delayed() ? MF_CHECKED : MF_UNCHECKED);
+            Delayed() ? MF_CHECKED : MF_UNCHECKED);
     }
 
     WellBehavedTrackPopup(hwnd, hMenu, pt);
@@ -57,9 +56,6 @@ void RightClickMenu(HWND hwnd, POINT pt)
 int APIENTRY wWinMain(HINSTANCE hinst, HINSTANCE, LPWSTR, int)
 {
     hInstance = hinst;
-    CTimer timer(UpdateIconAndTooltip, InjectBogusKeyboardInput);
-    gTimer = &timer;
-
     if (CreateTrayWindow() && CreatePreviewWindow())
     {
         MSG msg;
