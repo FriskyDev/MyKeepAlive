@@ -10,7 +10,7 @@ const UINT TimerMS = 10000;          // 10 seconds
 const UINT LongTimerMS = 60000;      // 1 minute
 const UINT DelayTimeoutM = 60 * 5;   // 5 hours
 
-bool paused = true;
+bool paused = startpaused;
 int TotalTimeRunningM = 0;
 int DelayRemainingM = 0;
 
@@ -56,7 +56,7 @@ void TogglePaused()
     UpdateIconAndTooltip();
 }
 
-void Callback(UINT id)
+void TimerCallback(UINT id)
 {
     if (id == IDT_TIMER_LONG) /* fires every minute */
     {

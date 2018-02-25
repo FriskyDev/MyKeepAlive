@@ -16,6 +16,8 @@
 #define STRLEN(str) (int)wcslen(str)
 #define BUFSTR(buf) (LPWSTR)&buf
 
+const bool startpaused = false;
+
 // main.cpp
 extern HINSTANCE hInstance;
 void InjectBogusKeyboardInput();
@@ -31,10 +33,9 @@ void ShowHidePreview(bool show);
 
 // timer.cpp
 void CreateTimers(HWND hwnd);
+void TimerCallback(UINT id);
 bool Delayed();
 bool Paused();
-
-void Callback(UINT id);
 void ToggleDelay();
 void TogglePaused();
 void HrsMinDelayed(UINT* hrs, UINT* min);

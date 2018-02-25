@@ -4,6 +4,7 @@
 using namespace std;
 
 NOTIFYICONDATA nid = {};
+
 void UpdateShellIconInfo(DWORD msg)
 {
     if (!Shell_NotifyIcon(msg, &nid))
@@ -14,6 +15,8 @@ void UpdateShellIconInfo(DWORD msg)
 
 void UpdateIconAndTooltip()
 {
+    // Called on launch, and from the timer when things change
+
     const bool paused = Paused();
     const bool delayed = Delayed();
     UINT hours, minutes;
@@ -42,7 +45,6 @@ void UpdateIconAndTooltip()
             hours, minutes);
     }
 
-    // Send updates to shell
     UpdateShellIconInfo(NIM_MODIFY);
 }
 
@@ -67,7 +69,7 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         break;
 
     case WM_TIMER:
-        Callback(LOWORD(wParam));
+        TimerCallback(LOWORD(wParam));
         break;
 
     case WM_USER_SHELLICON:
@@ -94,7 +96,7 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         switch (LOWORD(wParam))
         {
         case IDM_EXIT:
-            Shell_NotifyIcon(NIM_DELETE, &nid);
+            UpdateShellIconInfo(NIM_DELETE);
             PostQuitMessage(0);
             break;
 
