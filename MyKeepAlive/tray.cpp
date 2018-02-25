@@ -3,6 +3,15 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
+//
+// Create and register the tray window
+//  - Sets up timers on create, and delivers timer messages.
+//  - Maintains the tray icon state and tooltip text.
+//  - Handles clicks, right for menu, left for preview window.
+//  - Creates the right click menu 'on the fly'
+//      to change depending on pause/ delay state
+//
+
 NOTIFYICONDATA nid = {};
 
 void UpdateShellIconInfo(DWORD msg)
@@ -15,8 +24,6 @@ void UpdateShellIconInfo(DWORD msg)
 
 void UpdateIconAndTooltip()
 {
-    // Called on launch, and from the timer when things change
-
     const bool paused = Paused();
     const bool delayed = Delayed();
     UINT hours, minutes;
@@ -46,6 +53,48 @@ void UpdateIconAndTooltip()
     }
 
     UpdateShellIconInfo(NIM_MODIFY);
+}
+
+void RightClickMenu(HWND hwnd, POINT pt)
+{
+    HMENU hMenu = CreatePopupMenu();
+
+    InsertMenu(hMenu, 0xFFFFFFFF,
+        MF_BYPOSITION | MF_STRING,
+        IDM_EXIT, L"Exit");
+
+    InsertMenu(hMenu, 0xFFFFFFFF,
+        MF_BYPOSITION | MF_STRING,
+        IDM_TOGGLEPAUSE, L"Pause");
+
+    CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
+        Paused() ? MF_CHECKED : MF_UNCHECKED);
+
+    if (!Paused())
+    {
+        WCHAR mnItemBuf[100];
+        if (Delayed())
+        {
+            UINT hours, minutes;
+            HrsMinDelayed(&hours, &minutes);
+
+            swprintf(BUFSTR(mnItemBuf), 100,
+                L"Pause in %i hr %i min", hours, minutes);
+        }
+        else
+        {
+            swprintf(BUFSTR(mnItemBuf), 100, L"Pause in 5 hours");
+        }
+
+        InsertMenu(hMenu, 0xFFFFFFFF,
+            MF_BYPOSITION | MF_STRING,
+            IDM_TOGGLE5HRDELAY, BUFSTR(mnItemBuf));
+
+        CheckMenuItem(hMenu, IDM_TOGGLE5HRDELAY,
+            Delayed() ? MF_CHECKED : MF_UNCHECKED);
+    }
+
+    WellBehavedTrackPopup(hwnd, hMenu, pt);
 }
 
 LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)

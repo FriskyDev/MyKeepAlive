@@ -3,54 +3,22 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
+//
+// Creates two windows, one that registers as a tray window
+// with the shell, the other a small popup window shown when
+// the user clicks on the tray icon.
+//
+// A timer is run by the tray window, which will call
+// InjectBogusKeyboardInput periodically to simulate a keyboard
+// press.
+//
+
 HINSTANCE hInstance = nullptr;
 
 void InjectBogusKeyboardInput()
 {
     static INPUT i = { INPUT_KEYBOARD,{ VK_F24, 0, 0, 0, 0 } };
     SendInput(1, &i, sizeof(INPUT));
-}
-
-void RightClickMenu(HWND hwnd, POINT pt)
-{
-    HMENU hMenu = CreatePopupMenu();
-
-    InsertMenu(hMenu, 0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_EXIT, L"Exit");
-
-    InsertMenu(hMenu, 0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_TOGGLEPAUSE, L"Pause");
-
-    CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
-        Paused() ? MF_CHECKED : MF_UNCHECKED);
-
-    if (!Paused())
-    {
-        WCHAR mnItemBuf[100];
-        if (Delayed())
-        {
-            UINT hours, minutes;
-            HrsMinDelayed(&hours, &minutes);
-
-            swprintf(BUFSTR(mnItemBuf), 100,
-                L"Pause in %i hr %i min", hours, minutes);
-        }
-        else
-        {
-            swprintf(BUFSTR(mnItemBuf), 100, L"Pause in 5 hours");
-        }
-
-        InsertMenu(hMenu, 0xFFFFFFFF,
-            MF_BYPOSITION | MF_STRING,
-            IDM_TOGGLE5HRDELAY, BUFSTR(mnItemBuf));
-
-        CheckMenuItem(hMenu, IDM_TOGGLE5HRDELAY,
-            Delayed() ? MF_CHECKED : MF_UNCHECKED);
-    }
-
-    WellBehavedTrackPopup(hwnd, hMenu, pt);
 }
 
 int APIENTRY wWinMain(HINSTANCE hinst, HINSTANCE, LPWSTR, int)

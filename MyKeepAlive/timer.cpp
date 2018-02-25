@@ -3,16 +3,23 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
+//
+// Maintain timers, the paused state, and the 'delay' timeout
+//  - Every 10 seconds (unless paused), calls InjectBogusKeyboardInput.
+//  - When delay is enabled, will auto-pause in 5 hours.
+//  - When pause state, or delay time changes, calls UpdateIconAndTooltip.
+//
+
 #define IDT_TIMER           101
 #define IDT_TIMER_LONG      102
 
-const UINT TimerMS = 10000;          // 10 seconds
-const UINT LongTimerMS = 60000;      // 1 minute
-const UINT DelayTimeoutM = 60 * 5;   // 5 hours
-
 bool paused = startpaused;
-int TotalTimeRunningM = 0;
-int DelayRemainingM = 0;
+
+const UINT TimerMS = 10000;         // 10 seconds
+const UINT LongTimerMS = 60000;     // 1 minute
+const UINT DelayTimeoutM = 60 * 5;  // 5 hours
+int DelayRemainingM = -1;           // tracks minutes until auto-pause
+int TotalTimeRunningM = 0;          // tracks total minutes since launched
 
 bool Paused()
 {
@@ -21,7 +28,7 @@ bool Paused()
 
 bool Delayed()
 {
-    return DelayRemainingM <= 0;
+    return DelayRemainingM > 0;
 }
 
 void HrsMinDelayed(UINT* hrs, UINT* min)
@@ -70,6 +77,8 @@ void TimerCallback(UINT id)
         {
             DelayRemainingM--;
         }
+
+        UpdateIconAndTooltip();
     }
     else /* IDT_TIMER, fires every ten seconds */
     {
@@ -78,8 +87,6 @@ void TimerCallback(UINT id)
             InjectBogusKeyboardInput();
         }
     }
-
-    UpdateIconAndTooltip();
 }
 
 void CreateTimers(HWND hwnd)

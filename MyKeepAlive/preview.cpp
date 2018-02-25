@@ -11,51 +11,16 @@ const int FontSize = 20;
 const int FontSizeSm = 15;
 
 HWND hwndPreview = nullptr;
-UINT dpi = 96;
 HFONT hfont = nullptr;
 HFONT hfontSm = nullptr;
 
+UINT dpi = 96;
 #define DPISCALE(val) MulDiv(val, dpi, 96)
-
-void RefreshFontsForDpi(UINT dpi)
-{
-    static UINT dpiLast = 0;
-    if (dpiLast != dpi)
-    {
-        dpiLast = dpi;
-
-        if (hfont != nullptr)
-        {
-            DeleteFont(hfont);
-        }
-
-        hfont = CreateFont(
-            DPISCALE(FontSize),
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            FontName);
-
-        if (hfontSm != nullptr)
-        {
-            DeleteFont(hfontSm);
-        }
-
-        hfontSm = CreateFont(
-            DPISCALE(FontSizeSm),
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            FontName);
-    }
-
-    if (hfont == nullptr || hfontSm == nullptr)
-    {
-        Error(L"Draw preview window failed to create fonts.");
-    }
-}
 
 void Draw(HDC hdc, HWND hwnd)
 {
     SetBkMode(hdc, TRANSPARENT);
-    RefreshFontsForDpi(dpi);
-    
+
     static HBRUSH hbrActive = CreateSolidBrush(rgbBackground);
     static HBRUSH hbrInactive = CreateSolidBrush(rgbBackgroundPaused);
 
@@ -113,6 +78,40 @@ void Draw(HDC hdc, HWND hwnd)
         &rc, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
 }
 
+void RefreshFontsForDpi(UINT dpi)
+{
+    static UINT dpiLast = 0;
+    if (dpiLast != dpi)
+    {
+        dpiLast = dpi;
+
+        if (hfont != nullptr)
+        {
+            DeleteFont(hfont);
+        }
+
+        hfont = CreateFont(
+            DPISCALE(FontSize),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            FontName);
+
+        if (hfontSm != nullptr)
+        {
+            DeleteFont(hfontSm);
+        }
+
+        hfontSm = CreateFont(
+            DPISCALE(FontSizeSm),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            FontName);
+    }
+
+    if (hfont == nullptr || hfontSm == nullptr)
+    {
+        Error(L"Draw preview window failed to create fonts.");
+    }
+}
+
 void ShowHidePreview(bool show)
 {
     if (show)
@@ -120,6 +119,7 @@ void ShowHidePreview(bool show)
         POINT pt;
         GetCursorPos(&pt);
         dpi = DpiFromPt(pt);
+        RefreshFontsForDpi(dpi);
 
         RECT rc = { pt.x, pt.y,
             pt.x + DPISCALE(PreviewSize.cx),
