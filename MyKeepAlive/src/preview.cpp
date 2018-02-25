@@ -4,11 +4,13 @@
 using namespace std;
 
 const SIZE PreviewSize = { 300, 150 };
-const COLORREF rgbBackground = RGB(91, 224, 76);
-const COLORREF rgbBackgroundPaused = RGB(242, 207, 31);
 const LPCWSTR FontName = L"Courier New";
 const int FontSize = 20;
 const int FontSizeSm = 15;
+
+#define rgbMAIZE RGB(255,203,5)
+#define rgbBLUE  RGB(0,39,76)
+#define rgbWHITE RGB(255,255,255)
 
 HWND hwndPreview = nullptr;
 HFONT hfont = nullptr;
@@ -21,8 +23,13 @@ void Draw(HDC hdc, HWND hwnd)
 {
     SetBkMode(hdc, TRANSPARENT);
 
-    static HBRUSH hbrActive = CreateSolidBrush(rgbBackground);
-    static HBRUSH hbrInactive = CreateSolidBrush(rgbBackgroundPaused);
+    if (!Paused())
+    {
+        SetTextColor(hdc, rgbWHITE);
+    }
+
+    static HBRUSH hbrActive = CreateSolidBrush(rgbBLUE);
+    static HBRUSH hbrInactive = CreateSolidBrush(rgbMAIZE);
 
     RECT rc;
     GetClientRect(hwnd, &rc);
