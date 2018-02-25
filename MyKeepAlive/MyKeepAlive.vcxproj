@@ -158,22 +158,22 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="MyKeepAlive.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="src\MyKeepAlive.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="helpers.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="src\helpers.cpp" />
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\preview.cpp" />
+    <ClCompile Include="src\timer.cpp" />
+    <ClCompile Include="src\tray.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="preview.cpp" />
-    <ClCompile Include="timer.cpp" />
-    <ClCompile Include="tray.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="MyKeepAlive.rc" />

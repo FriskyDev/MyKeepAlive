@@ -6,7 +6,7 @@
 #include "ShellScalingAPI.h"
 #include <tchar.h>
 #include <string>
-#include "resource.h"
+#include "..\resource.h"
 
 #define IDM_EXIT            111
 #define IDM_TOGGLEPAUSE     112
