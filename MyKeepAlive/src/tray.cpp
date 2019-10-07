@@ -3,17 +3,79 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
+#define IDM_EXIT            111
+#define IDM_TOGGLEPAUSE     112
+#define	WM_USER_SHELLICON   WM_USER + 1
+const LPCWSTR szTitle = L"keepalive";
+const LPCWSTR szWindowClass = L"keepalive_traywindow";
+const UINT WM_POKE = WM_USER + 101;
+
+void UpdateState();
+
+//
+// Global paused, starts false (aka not paused)
+//
+bool paused = false;
+
+bool Paused()
+{
+	return paused;
+}
+
+void TogglePaused()
+{
+	paused = !paused;
+
+	UpdateState();
+}
+
+
+//
+// Every 10 seconds, inject a zero-zero mouse input (unless paused)
+//
+const UINT TimerMS = 10000; // 10 seconds
+
+void TimerCallback(HWND, UINT, UINT_PTR, DWORD)
+{
+	if (!Paused())
+	{
+		static INPUT i = { INPUT_MOUSE,{} };
+		SendInput(1, &i, sizeof(INPUT));
+	}
+}
+
+//
+// Updates to the tray icon are given to shell using Shell_NotifyIcon
+//
 NOTIFYICONDATA nid = {};
 
 void UpdateShellIconInfo(DWORD msg)
 {
     if (!Shell_NotifyIcon(msg, &nid))
     {
-        //Error(L"Shell_NotifyIcon failed!");
+		// This does sometimes fail, shows shell crashed....
+		// todo, might need to cleanup/ relaunch??
+		Warning(L"Shell_NotifyIcon failed!");
     }
 }
 
-void UpdateRunningState()
+void InitShellIconInfo(HWND hwnd)
+{
+	nid.cbSize = sizeof(NOTIFYICONDATA);
+	nid.hWnd = hwnd;
+	nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_SHOWTIP | NIF_TIP;
+	nid.uCallbackMessage = WM_USER_SHELLICON;
+	nid.uID = 13542;
+	UpdateShellIconInfo(NIM_ADD);
+
+	UpdateState();
+}
+
+
+//
+// On state changes, update tray icon, tooltip text, etc
+//
+void UpdateState()
 {
     static HICON hIconOn = LoadIcon(hInstance,
         (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC_ACTIVE));
@@ -26,13 +88,17 @@ void UpdateRunningState()
     UpdateShellIconInfo(NIM_MODIFY);
 }
 
-void RightClickMenu(HWND hwnd, POINT pt)
-{
-    HMENU hMenu = CreatePopupMenu();
 
-    InsertMenu(hMenu, 0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_EXIT, L"Exit");
+//
+// On right click, build a context menu with pause and exit options
+//
+void RightClickMenu(HWND hwnd)
+{
+	POINT pt;
+	GetCursorPos(&pt);
+	pt = KeepPointInRect(pt, WorkAreaFromPoint(pt));
+
+    HMENU hMenu = CreatePopupMenu();
 
     InsertMenu(hMenu, 0xFFFFFFFF,
         MF_BYPOSITION | MF_STRING,
@@ -41,7 +107,53 @@ void RightClickMenu(HWND hwnd, POINT pt)
     CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
         Paused() ? MF_CHECKED : MF_UNCHECKED);
 
+	// keep exit as last, closest to cursor when opened
+	InsertMenu(hMenu, 0xFFFFFFFF,
+		MF_BYPOSITION | MF_STRING,
+		IDM_EXIT, L"Exit");
+
     WellBehavedTrackPopup(hwnd, hMenu, pt);
+}
+
+void OnContextMenuSelection(WORD cmd)
+{
+	switch (cmd)
+	{
+	case IDM_EXIT:
+		UpdateShellIconInfo(NIM_DELETE);
+		PostQuitMessage(0);
+		break;
+
+	case IDM_TOGGLEPAUSE:
+		TogglePaused();
+		break;
+	}
+
+}
+
+//
+// Input handlers (input over tray icon)
+//
+void OnInput(HWND hwnd, WORD cmd)
+{
+	switch (cmd)
+	{
+	// Right button, show context menu
+	case WM_RBUTTONDOWN:
+		RightClickMenu(hwnd);
+		break;
+
+	// Left button, show preview window
+	case WM_LBUTTONDOWN:
+		ShowHidePreview(true);
+		break;
+
+	// double click, toggle pause
+	case WM_LBUTTONDBLCLK:
+		TogglePaused();
+		ShowHidePreview(false);
+		break;
+	}
 }
 
 LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -49,63 +161,39 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
     switch (message)
     {
     case WM_CREATE:
-        CreateTimers(hwnd);
-
-        nid.cbSize = sizeof(NOTIFYICONDATA);
-        nid.hWnd = hwnd;
-        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_SHOWTIP | NIF_TIP;
-        nid.uCallbackMessage = WM_USER_SHELLICON;
-        nid.uID = 13542;
-        UpdateShellIconInfo(NIM_ADD);
-
-        UpdateRunningState();
+		// Setup timer, and initialize icon state
+		SetTimer(hwnd, 101, TimerMS, (TIMERPROC)TimerCallback);
+		InitShellIconInfo(hwnd);
         break;
 
+	// Input messages are sent via our callback message
     case WM_USER_SHELLICON:
-		switch (LOWORD(lParam))
-		{
-		case WM_RBUTTONDOWN:
-		{
-			POINT pt;
-			GetCursorPos(&pt);
-			pt = KeepPointInRect(pt, WorkAreaFromPoint(pt));
-			RightClickMenu(hwnd, pt);
-			break;
-		}
-		case WM_LBUTTONDOWN:
-			ShowHidePreview(true);
-			break;
-
-		case WM_LBUTTONDBLCLK:
-			TogglePaused();
-			ShowHidePreview(false);
-			break;
-		}
+		OnInput(hwnd, LOWORD(lParam));
 		break;
 
-    case WM_COMMAND:
-        switch (LOWORD(wParam))
-        {
-        case IDM_EXIT:
-            UpdateShellIconInfo(NIM_DELETE);
-            PostQuitMessage(0);
-            break;
-
-        case IDM_TOGGLEPAUSE:
-            TogglePaused();
-            break;
-        }
+	// Right click messages are sent within WM_COMMAND
+	case WM_COMMAND:
+		OnContextMenuSelection(LOWORD(wParam));
         break;
+
+	// On startup, finds existing window and pokes. Return non zero.
+	case WM_POKE: return 1;
     }
 
     return DefWindowProc(hwnd, message, wParam, lParam);
 }
 
+bool IsAlreadyRunning()
+{
+	HWND hwnd = FindWindow(szWindowClass, szTitle);
+	DWORD_PTR dw = 0;
+	return ((hwnd) &&
+		(SendMessageTimeout(hwnd, WM_POKE, 0, 0, 0, 100, &dw) != 0) &&
+		(dw != 0));
+}
+
 bool CreateTrayWindow()
 {
-    const LPCWSTR szTitle = L"keepalive";
-    const LPCWSTR szWindowClass = L"keepalive_class";
-
     WNDCLASSEX wcex = {};
     wcex.cbSize = sizeof(WNDCLASSEX);
     wcex.style = CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
@@ -117,17 +205,20 @@ bool CreateTrayWindow()
     wcex.hIconSm = nullptr;
     if (RegisterClassEx(&wcex) == 0)
     {
-        Error(L"Register Tray failed!");
+        Error(L"RegisterWindow failed on tray window!");
         return false;
     }
 
-    if (CreateWindow(szWindowClass,
-                     szTitle,
-                     WS_OVERLAPPEDWINDOW,
-                     0, 0, 0, 0,
-                     nullptr, nullptr, hInstance, nullptr) == nullptr)
+	HWND hwnd = CreateWindow(
+		szWindowClass,
+		szTitle,
+		WS_OVERLAPPEDWINDOW,
+		0, 0, 0, 0,
+		nullptr, nullptr, hInstance, nullptr);
+
+	if (!hwnd)
     {
-        Error(L"Create Tray failed!");
+        Error(L"CreateWindow failed on tray window!");
         return false;
     }
 

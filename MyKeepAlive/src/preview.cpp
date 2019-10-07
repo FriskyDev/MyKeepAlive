@@ -51,7 +51,7 @@ void Draw(HDC hdc, HWND hwnd)
     DrawText(hdc, BUFSTR(StatusBuf), STRLEN(BUFSTR(StatusBuf)), &rc, DT_CENTER);
 }
 
-void RefreshFontsForDpi(UINT dpi)
+void RefreshFonts(UINT dpi)
 {
     static UINT dpiLast = 0;
     if (dpiLast != dpi)
@@ -89,25 +89,30 @@ void ShowHidePreview(bool show)
 {
     if (show)
     {
+		// Update dpi scale
         POINT pt;
         GetCursorPos(&pt);
         dpi = DpiFromPt(pt);
-        RefreshFontsForDpi(dpi);
+		RefreshFonts(dpi);
 
-        RECT rc = { pt.x, pt.y,
-            pt.x + DPISCALE(PreviewSize.cx),
-            pt.y + DPISCALE(PreviewSize.cy) };
+		// Position preview window and show
+		const SIZE sz = { DPISCALE(PreviewSize.cx), DPISCALE(PreviewSize.cy) };
+        RECT rc = { pt.x - (sz.cx / 2),
+					pt.y - (sz.cy / 2),
+		            pt.x + (sz.cx / 2),
+					pt.y + (sz.cy / 2) };
         rc = KeepRectInRect(rc, WorkAreaFromPoint(pt));
         SetWindowPos(hwndPreview, nullptr,
             rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
             SWP_SHOWWINDOW);
 
+		// Attempt to ensure in fg after created (because we track loss of fg to hide)
         SetForegroundWindow(hwndPreview);
     }
     else
     {
-        SetWindowPos(hwndPreview, nullptr, 0, 0, 0, 0,
-            SWP_HIDEWINDOW | SWP_NOMOVE | SWP_NOSIZE);
+		// Hide the window
+		ShowWindow(hwndPreview, SW_HIDE);
     }
 }
 

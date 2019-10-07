@@ -8,6 +8,10 @@ void Error(std::wstring msg)
     MessageBox(nullptr, msg.c_str(), _T("Error"), MB_OK);
     PostQuitMessage(1);
 }
+void Warning(std::wstring msg)
+{
+	MessageBox(nullptr, msg.c_str(), _T("Warning"), MB_OK);
+}
 
 RECT WorkAreaFromPoint(POINT pt)
 {
