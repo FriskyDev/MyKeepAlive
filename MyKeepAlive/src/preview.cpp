@@ -8,10 +8,6 @@ const LPCWSTR FontName = L"Courier New";
 const int FontSize = 20;
 const int FontSizeSm = 15;
 
-#define rgbMAIZE RGB(255,203,5)
-#define rgbBLUE  RGB(0,39,76)
-#define rgbWHITE RGB(255,255,255)
-
 HWND hwndPreview = nullptr;
 HFONT hfont = nullptr;
 HFONT hfontSm = nullptr;
@@ -25,64 +21,34 @@ void Draw(HDC hdc, HWND hwnd)
 
     if (!Paused())
     {
-        SetTextColor(hdc, rgbWHITE);
+        SetTextColor(hdc, RGB(255, 255, 255));
     }
 
-    static HBRUSH hbrActive = CreateSolidBrush(rgbBLUE);
-    static HBRUSH hbrInactive = CreateSolidBrush(rgbMAIZE);
+    static HBRUSH hbrActive = CreateSolidBrush(RGB(1, 115, 18));
+    static HBRUSH hbrInactive = CreateSolidBrush(RGB(199, 164, 10));
 
     RECT rc;
     GetClientRect(hwnd, &rc);
     FillRect(hdc, &rc, Paused() ? hbrInactive : hbrActive);
 
-    InflateRect(&rc, DPISCALE(-10) , DPISCALE(-10));
-
     SelectFont(hdc, hfont);
     LPCWSTR szHeader = L"Keep Alive";
+    rc.top += DPISCALE(PreviewSize.cy / 3);
     DrawText(hdc, szHeader, STRLEN(szHeader), &rc, DT_CENTER);
     rc.top += DPISCALE(FontSize) + DPISCALE(5);
-
-    SelectFont(hdc, hfontSm);
-    LPCWSTR szSubHeader = L"Injects f-24 key every\n10 seconds to simulate input.";
-    DrawText(hdc, szSubHeader, STRLEN(szSubHeader), &rc, DT_LEFT);
-    rc.top += 2 * DPISCALE(FontSizeSm) + DPISCALE(10);
 
     WCHAR StatusBuf[100];
     if (Paused())
     {
-        swprintf(BUFSTR(StatusBuf), 100, L"Status: Inactive\n(NOT injecting input)");
+        swprintf(BUFSTR(StatusBuf), 100, L"not running");
     }
     else
     {
-        swprintf(BUFSTR(StatusBuf), 100, L"Status: Running\n(injecting ghost input)");
+        swprintf(BUFSTR(StatusBuf), 100, L"running");
     }
 
-    DrawText(hdc, BUFSTR(StatusBuf), STRLEN(BUFSTR(StatusBuf)), &rc, DT_LEFT);
-    rc.top += DPISCALE(10);
-
-    UINT days, hours, minutes;
-    DaysHrsMinTotal(&days, &hours, &minutes);
-
-    WCHAR TotalTimeBuf[100];
-    if (days > 0)
-    {
-        swprintf(BUFSTR(TotalTimeBuf), 100,
-            L"%i days, %i hours, %i min",
-            days, hours, minutes);
-    }
-    else if (hours > 0)
-    {
-        swprintf(BUFSTR(TotalTimeBuf), 100,
-            L"%i hours, %i min", hours, minutes);
-    }
-    else
-    {
-        swprintf(BUFSTR(TotalTimeBuf), 100,
-            L"%i min", minutes);
-    }
-
-    DrawText(hdc, BUFSTR(TotalTimeBuf), STRLEN(BUFSTR(TotalTimeBuf)),
-        &rc, DT_RIGHT | DT_BOTTOM | DT_SINGLELINE);
+    SelectFont(hdc, hfontSm);
+    DrawText(hdc, BUFSTR(StatusBuf), STRLEN(BUFSTR(StatusBuf)), &rc, DT_CENTER);
 }
 
 void RefreshFontsForDpi(UINT dpi)
@@ -143,7 +109,6 @@ void ShowHidePreview(bool show)
         SetWindowPos(hwndPreview, nullptr, 0, 0, 0, 0,
             SWP_HIDEWINDOW | SWP_NOMOVE | SWP_NOSIZE);
     }
-
 }
 
 LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)

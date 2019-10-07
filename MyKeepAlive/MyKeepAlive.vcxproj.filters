@@ -41,9 +41,6 @@
     <ClCompile Include="src\preview.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\timer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\tray.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

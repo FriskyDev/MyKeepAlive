@@ -2,28 +2,64 @@
 #include "stdafx.h"
 #include "MyKeepAlive.h"
 using namespace std;
-
-//
-// Creates two windows, one that registers as a tray window
-// with the shell, the other a small popup window shown when
-// the user clicks on the tray icon.
-//
-// A timer is run by the tray window, which will call
-// InjectBogusKeyboardInput periodically to simulate a keyboard
-// press.
-//
-
 HINSTANCE hInstance = nullptr;
 
-void InjectBogusKeyboardInput()
+bool paused = false;
+const UINT TimerMS = 10000; // 10 seconds
+
+void InjectBogusInput()
 {
-    static INPUT i = { INPUT_KEYBOARD,{ VK_F24, 0, 0, 0, 0 } };
-    SendInput(1, &i, sizeof(INPUT));
+	static INPUT i = { INPUT_MOUSE,{} };
+	SendInput(1, &i, sizeof(INPUT));
+}
+
+bool Paused()
+{
+	return paused;
+}
+
+void TogglePaused()
+{
+	paused = !paused;
+
+	UpdateRunningState();
+}
+
+void TimerCallback(HWND, UINT, UINT_PTR, DWORD)
+{
+	if (!Paused())
+	{
+		InjectBogusInput();
+	}
+}
+
+void CreateTimers(HWND hwnd)
+{
+#define IDT_TIMER 101
+	SetTimer(hwnd, IDT_TIMER, TimerMS, TimerCallback);
+}
+
+void SetForStartup()
+{
+	// todo, some ui to give choice if set on startup?
+	// maybe check and message box prompt?
+
+	WCHAR buffer[MAX_PATH];
+	GetModuleFileName(NULL, buffer, MAX_PATH);
+	string::size_type pos = wstring(buffer).find_last_of(L"\\/");
+	if (pos != string::npos)
+	{
+		HKEY hkey = NULL;
+		RegCreateKey(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", &hkey);
+		RegSetValueEx(hkey, L"keepalive", 0, REG_SZ, (BYTE*)wstring(buffer).c_str(), (DWORD)(wcslen(wstring(buffer).c_str()) + 1) * 2);
+	}
 }
 
 int APIENTRY wWinMain(HINSTANCE hinst, HINSTANCE, LPWSTR, int)
 {
-    hInstance = hinst;
+	SetForStartup();
+
+	hInstance = hinst;
     if (CreateTrayWindow() && CreatePreviewWindow())
     {
         MSG msg;

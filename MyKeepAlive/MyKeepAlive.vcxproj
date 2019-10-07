@@ -166,7 +166,6 @@
     <ClCompile Include="src\helpers.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\preview.cpp" />
-    <ClCompile Include="src\timer.cpp" />
     <ClCompile Include="src\tray.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

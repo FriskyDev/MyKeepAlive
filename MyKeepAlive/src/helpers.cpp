@@ -28,8 +28,10 @@ UINT DpiFromPt(POINT pt)
 
 POINT KeepPointInRect(POINT pt, RECT rc)
 {
-    return { min(max(pt.x, rc.left), rc.right),
-             min(max(pt.x, rc.top), rc.bottom) };
+    return {
+		min(max(pt.x, rc.left), rc.right),
+		min(max(pt.x, rc.top), rc.bottom)
+	};
 }
 
 RECT KeepRectInRect(RECT rcStartRect, RECT rcBounds)
@@ -63,19 +65,4 @@ void WellBehavedTrackPopup(HWND hwnd, HMENU hMenu, POINT pt)
         pt.x, pt.y, 0, hwnd, nullptr);
 
     PostMessage(hwnd, WM_NULL, 0, 0);
-}
-
-void DaysMinsSecsFromMinutes(
-    _In_ UINT minutes,
-    _Out_ UINT* days,
-    _Out_ UINT* hours,
-    _Out_ UINT* minutesRemaining)
-{
-    *days = (minutes / 60 / 12);
-    minutes -= (*days * 12 * 60);
-
-    *hours = (minutes / 60);
-    minutes -= (*hours * 60);
-
-    *minutesRemaining = minutes;
 }

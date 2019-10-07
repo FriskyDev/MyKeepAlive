@@ -3,54 +3,25 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
-//
-// Create and register the tray window
-//  - Sets up timers on create, and delivers timer messages.
-//  - Maintains the tray icon state and tooltip text.
-//  - Handles clicks, right for menu, left for preview window.
-//  - Creates the right click menu 'on the fly'
-//      to change depending on pause/ delay state
-//
-
 NOTIFYICONDATA nid = {};
 
 void UpdateShellIconInfo(DWORD msg)
 {
     if (!Shell_NotifyIcon(msg, &nid))
     {
-        Error(L"Shell_NotifyIcon failed!");
+        //Error(L"Shell_NotifyIcon failed!");
     }
 }
 
-void UpdateIconAndTooltip()
+void UpdateRunningState()
 {
-    const bool paused = Paused();
-    const bool delayed = Delayed();
-    UINT hours, minutes;
-    HrsMinDelayed(&hours, &minutes);
-
     static HICON hIconOn = LoadIcon(hInstance,
         (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC_ACTIVE));
     static HICON hIconOff = LoadIcon(hInstance,
         (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC));
 
-    static LPCWSTR strTooltipPause = L"Keep Alive - Paused";
-    static LPCWSTR strTooltipRunning = L"Keep Alive - Paused";
-
-    // Update the tray icon
-    nid.hIcon = (paused ? hIconOff : hIconOn);
-
-    // Update the tooltip text
-    if (paused || !delayed)
-    {
-        wcscpy_s(nid.szTip, paused ? strTooltipPause : strTooltipRunning);
-    }
-    else
-    {
-        swprintf(nid.szTip, 128,
-            L"Keep Alive - Timer Running\n%i hr %i min remaining",
-            hours, minutes);
-    }
+    nid.hIcon = (Paused() ? hIconOff : hIconOn);
+    wcscpy_s(nid.szTip, Paused() ? L"Keep Alive - Paused" : L"Keep Alive - Running");
 
     UpdateShellIconInfo(NIM_MODIFY);
 }
@@ -70,30 +41,6 @@ void RightClickMenu(HWND hwnd, POINT pt)
     CheckMenuItem(hMenu, IDM_TOGGLEPAUSE,
         Paused() ? MF_CHECKED : MF_UNCHECKED);
 
-    if (!Paused())
-    {
-        WCHAR mnItemBuf[100];
-        if (Delayed())
-        {
-            UINT hours, minutes;
-            HrsMinDelayed(&hours, &minutes);
-
-            swprintf(BUFSTR(mnItemBuf), 100,
-                L"Pause in %i hr %i min", hours, minutes);
-        }
-        else
-        {
-            swprintf(BUFSTR(mnItemBuf), 100, L"Pause in 5 hours");
-        }
-
-        InsertMenu(hMenu, 0xFFFFFFFF,
-            MF_BYPOSITION | MF_STRING,
-            IDM_TOGGLE5HRDELAY, BUFSTR(mnItemBuf));
-
-        CheckMenuItem(hMenu, IDM_TOGGLE5HRDELAY,
-            Delayed() ? MF_CHECKED : MF_UNCHECKED);
-    }
-
     WellBehavedTrackPopup(hwnd, hMenu, pt);
 }
 
@@ -102,44 +49,39 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
     switch (message)
     {
     case WM_CREATE:
-        // Register the timers
         CreateTimers(hwnd);
 
-        // Register the Notify Icon
         nid.cbSize = sizeof(NOTIFYICONDATA);
         nid.hWnd = hwnd;
         nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_SHOWTIP | NIF_TIP;
         nid.uCallbackMessage = WM_USER_SHELLICON;
-        nid.uID = 13542; // not sure what this is...
+        nid.uID = 13542;
         UpdateShellIconInfo(NIM_ADD);
 
-        // Set initial icon and tooltip text
-        UpdateIconAndTooltip();
-        break;
-
-    case WM_TIMER:
-        TimerCallback(LOWORD(wParam));
+        UpdateRunningState();
         break;
 
     case WM_USER_SHELLICON:
-        switch (LOWORD(lParam))
-        {
-        case WM_RBUTTONDOWN:
-        case WM_LBUTTONDOWN:
-            if (LOWORD(lParam) == WM_RBUTTONDOWN)
-            {
-                POINT pt;
-                GetCursorPos(&pt);
-                pt = KeepPointInRect(pt, WorkAreaFromPoint(pt));
-                RightClickMenu(hwnd, pt);
-            }
-            else
-            {
-                ShowHidePreview(true);
-            }
-            break;
-        }
-        break;
+		switch (LOWORD(lParam))
+		{
+		case WM_RBUTTONDOWN:
+		{
+			POINT pt;
+			GetCursorPos(&pt);
+			pt = KeepPointInRect(pt, WorkAreaFromPoint(pt));
+			RightClickMenu(hwnd, pt);
+			break;
+		}
+		case WM_LBUTTONDOWN:
+			ShowHidePreview(true);
+			break;
+
+		case WM_LBUTTONDBLCLK:
+			TogglePaused();
+			ShowHidePreview(false);
+			break;
+		}
+		break;
 
     case WM_COMMAND:
         switch (LOWORD(wParam))
@@ -151,10 +93,6 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
 
         case IDM_TOGGLEPAUSE:
             TogglePaused();
-            break;
-
-        case IDM_TOGGLE5HRDELAY:
-            ToggleDelay();
             break;
         }
         break;
