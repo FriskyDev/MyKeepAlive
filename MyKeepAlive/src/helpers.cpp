@@ -10,7 +10,7 @@ void Error(std::wstring msg)
 }
 void Warning(std::wstring msg)
 {
-	MessageBox(nullptr, msg.c_str(), _T("Warning"), MB_OK);
+    MessageBox(nullptr, msg.c_str(), _T("Warning"), MB_OK);
 }
 
 RECT WorkAreaFromPoint(POINT pt)
@@ -33,9 +33,9 @@ UINT DpiFromPt(POINT pt)
 POINT KeepPointInRect(POINT pt, RECT rc)
 {
     return {
-		min(max(pt.x, rc.left), rc.right),
-		min(max(pt.x, rc.top), rc.bottom)
-	};
+        min(max(pt.x, rc.left), rc.right),
+        min(max(pt.x, rc.top), rc.bottom)
+    };
 }
 
 RECT KeepRectInRect(RECT rcStartRect, RECT rcBounds)
@@ -69,4 +69,17 @@ void WellBehavedTrackPopup(HWND hwnd, HMENU hMenu, POINT pt)
         pt.x, pt.y, 0, hwnd, nullptr);
 
     PostMessage(hwnd, WM_NULL, 0, 0);
+}
+
+void ReCreateFont(HFONT* phFont, UINT size, LPCWSTR fontName)
+{
+    if (*phFont != nullptr)
+    {
+        DeleteFont(*phFont);
+    }
+    *phFont = CreateFont(size, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, fontName);
+    if (*phFont == nullptr)
+    {
+        Error(L"Draw preview window failed to create fonts.");
+    }
 }

@@ -3,117 +3,116 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
-const SIZE PreviewSize = { 300, 150 };
-const LPCWSTR FontName = L"Courier New";
-const int FontSize = 20;
-const int FontSizeSm = 15;
+const SIZE WindowSize       = { 300, 150 };
+const int FontSize          = 30;
+const int FontSizeSm        = 15;
 
-HWND hwndPreview = nullptr;
-HFONT hfont = nullptr;
-HFONT hfontSm = nullptr;
+HWND ghwnd                  = nullptr;
+HFONT ghFont                = nullptr;
+HFONT ghFontSm              = nullptr;
+UINT gdpi                   = 96;
 
-UINT dpi = 96;
-#define DPISCALE(val) MulDiv(val, dpi, 96)
+#define DPISCALE(val)       MulDiv(val, gdpi, 96)
 
-void Draw(HDC hdc, HWND hwnd)
+void UpdatePreviewWindow()
+{
+    InvalidateRect(ghwnd, nullptr, true);
+}
+
+void DrawPreviewWindow(HDC hdc, HWND hwnd)
 {
     SetBkMode(hdc, TRANSPARENT);
 
-    if (!Paused())
+    // Default (black) text if running, white text if paused
+    if (!IsPaused())
     {
         SetTextColor(hdc, RGB(255, 255, 255));
     }
 
+    // Green background if running, yellow if paused
     static HBRUSH hbrActive = CreateSolidBrush(RGB(1, 115, 18));
     static HBRUSH hbrInactive = CreateSolidBrush(RGB(199, 164, 10));
+    HBRUSH hbr = IsPaused() ? hbrInactive : hbrActive;
 
+    // Paint background
     RECT rc;
     GetClientRect(hwnd, &rc);
-    FillRect(hdc, &rc, Paused() ? hbrInactive : hbrActive);
+    FillRect(hdc, &rc, hbr);
 
-    SelectFont(hdc, hfont);
+    // Draw main text
     LPCWSTR szHeader = L"Keep Alive";
-    rc.top += DPISCALE(PreviewSize.cy / 3);
-    DrawText(hdc, szHeader, STRLEN(szHeader), &rc, DT_CENTER);
+    SelectFont(hdc, ghFont);
+    rc.top += DPISCALE(WindowSize.cy / 3);
+    DrawText(hdc, szHeader, (int)wcslen(szHeader), &rc, DT_CENTER);
+
+    // Draw sub text
+    LPCWSTR szStatus = IsPaused() ? L"not running" : L"running";
     rc.top += DPISCALE(FontSize) + DPISCALE(5);
-
-    WCHAR StatusBuf[100];
-    if (Paused())
-    {
-        swprintf(BUFSTR(StatusBuf), 100, L"not running");
-    }
-    else
-    {
-        swprintf(BUFSTR(StatusBuf), 100, L"running");
-    }
-
-    SelectFont(hdc, hfontSm);
-    DrawText(hdc, BUFSTR(StatusBuf), STRLEN(BUFSTR(StatusBuf)), &rc, DT_CENTER);
+    SelectFont(hdc, ghFontSm);
+    DrawText(hdc, szStatus, (int)wcslen(szStatus), &rc, DT_CENTER);
 }
 
-void RefreshFonts(UINT dpi)
+void EnsureFonts()
 {
+    // Only load fonts the first time called or when dpi changes
     static UINT dpiLast = 0;
-    if (dpiLast != dpi)
+    if (dpiLast == gdpi)
     {
-        dpiLast = dpi;
-
-        if (hfont != nullptr)
-        {
-            DeleteFont(hfont);
-        }
-
-        hfont = CreateFont(
-            DPISCALE(FontSize),
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            FontName);
-
-        if (hfontSm != nullptr)
-        {
-            DeleteFont(hfontSm);
-        }
-
-        hfontSm = CreateFont(
-            DPISCALE(FontSizeSm),
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            FontName);
+        return;
     }
+    dpiLast = gdpi;
 
-    if (hfont == nullptr || hfontSm == nullptr)
-    {
-        Error(L"Draw preview window failed to create fonts.");
-    }
+    // Create large and small font (and destroy previous fonts)
+    const LPCWSTR FontName = L"Courier New";
+    ReCreateFont(&ghFont, DPISCALE(FontSize), FontName);
+    ReCreateFont(&ghFontSm, DPISCALE(FontSizeSm), FontName);
 }
 
-void ShowHidePreview(bool show)
+void ShowHidePreviewWindow(bool show)
 {
-    if (show)
+    // Remember last hide time, ignore shows immediatly following a hide.
+    static ULONGLONG lasthide = 0;
+    if (!show)
     {
-		// Update dpi scale
-        POINT pt;
-        GetCursorPos(&pt);
-        dpi = DpiFromPt(pt);
-		RefreshFonts(dpi);
-
-		// Position preview window and show
-		const SIZE sz = { DPISCALE(PreviewSize.cx), DPISCALE(PreviewSize.cy) };
-        RECT rc = { pt.x - (sz.cx / 2),
-					pt.y - (sz.cy / 2),
-		            pt.x + (sz.cx / 2),
-					pt.y + (sz.cy / 2) };
-        rc = KeepRectInRect(rc, WorkAreaFromPoint(pt));
-        SetWindowPos(hwndPreview, nullptr,
-            rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top,
-            SWP_SHOWWINDOW);
-
-		// Attempt to ensure in fg after created (because we track loss of fg to hide)
-        SetForegroundWindow(hwndPreview);
+        lasthide = GetTickCount64();
     }
-    else
+    else if ((GetTickCount64() - lasthide) < 150)
     {
-		// Hide the window
-		ShowWindow(hwndPreview, SW_HIDE);
+        // Note: this is for clicking on the tray button several times.
+        // The click causes a de-activation (hide) and a show (click).
+        // Dropping the show here changes clicking on the tray from a show
+        // (and a flash if clicked multiple times) to a toggle.
+        return;
     }
+
+    // If hide, hide and return
+    if (!show)
+    {
+        ShowWindow(ghwnd, SW_HIDE);
+        return;
+    }
+
+    // When shown, window is positioned and sized around current cursor position.
+    POINT ptCursor;
+    GetCursorPos(&ptCursor);
+
+    // Update dpi scale and fonts
+    gdpi = DpiFromPt(ptCursor);
+    EnsureFonts();
+
+    // Start with rect centered around cursor, and move to be entirely in work area
+    const SIZE sz = { DPISCALE(WindowSize.cx), DPISCALE(WindowSize.cy) };
+    RECT rc = { ptCursor.x - (sz.cx / 2),
+        ptCursor.y - (sz.cy / 2),
+        ptCursor.x + (sz.cx / 2),
+        ptCursor.y + (sz.cy / 2) };
+    rc = KeepRectInRect(rc, WorkAreaFromPoint(ptCursor));
+
+    // Position and show window
+    SetWindowPos(ghwnd, 0, rc.left, rc.top, sz.cx, sz.cy, SWP_SHOWWINDOW);
+
+    // Ensure window in foreground
+    SetForegroundWindow(ghwnd);
 }
 
 LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -121,27 +120,31 @@ LRESULT CALLBACK PreviewWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM l
     switch (message)
     {
     case WM_CREATE:
-        hwndPreview = hwnd;
+        ghwnd = hwnd;
+
+        // Start hidden
+        ShowHidePreviewWindow(false);
         break;
 
     case WM_PAINT:
     {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
-        Draw(hdc, hwnd);
+        DrawPreviewWindow(hdc, hwnd);
         EndPaint(hwnd, &ps);
         break;
     }
 
+    // Clicking anywhere on the preview window toggles pause
     case WM_LBUTTONDOWN:
-        TogglePaused();
-        InvalidateRect(hwnd, nullptr, true);
+        ToggleIsPaused();
         break;
 
+    // When losing activation, hide
     case WM_ACTIVATE:
         if (wParam == WA_INACTIVE)
         {
-            ShowHidePreview(false);
+            ShowHidePreviewWindow(false);
         }
         break;
     }
@@ -173,12 +176,13 @@ bool CreatePreviewWindow()
         return FALSE;
     }
 
-    if (CreateWindowEx(WS_EX_TOOLWINDOW,
-                       szPreviewWindowClass,
-                       L"",
-                       WS_POPUP,
-                       0, 0, 0, 0,
-                       nullptr, nullptr, hInstance, nullptr) == nullptr)
+    if (CreateWindowEx(
+            WS_EX_TOOLWINDOW,
+            szPreviewWindowClass,
+            L"",
+            WS_POPUP,
+            0, 0, 0, 0,
+            nullptr, nullptr, hInstance, nullptr) == nullptr)
     {
         Error(L"Create Preview Window failed!");
         return false;
