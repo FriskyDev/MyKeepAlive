@@ -136,7 +136,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -158,29 +158,21 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Resource.h" />
-    <ClInclude Include="src\MyKeepAlive.h" />
-    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="..\ico\Resource.h" />
+    <ClInclude Include="..\src\MyKeepAlive.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\helpers.cpp" />
-    <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\preview.cpp" />
-    <ClCompile Include="src\tray.cpp" />
-    <ClCompile Include="stdafx.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
+    <Image Include="..\ico\kbd_hand.ico" />
+    <Image Include="..\ico\kbd_hand_active.ico" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="MyKeepAlive.rc" />
+    <ResourceCompile Include="..\ico\MyKeepAlive.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="kbd_hand.png" />
-    <Image Include="MyKeepAlive.ico" />
-    <Image Include="small.ico" />
+    <ClCompile Include="..\src\helpers.cpp" />
+    <ClCompile Include="..\src\main.cpp" />
+    <ClCompile Include="..\src\preview.cpp" />
+    <ClCompile Include="..\src\tray.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

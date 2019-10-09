@@ -1,5 +1,4 @@
 
-#include "stdafx.h"
 #include "MyKeepAlive.h"
 using namespace std;
 

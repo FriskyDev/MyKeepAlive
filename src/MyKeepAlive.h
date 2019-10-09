@@ -6,7 +6,7 @@
 #include "ShellScalingAPI.h"
 #include <tchar.h>
 #include <string>
-#include "..\resource.h"
+#include "..\ico\resource.h"
 
 extern HINSTANCE hInstance;
 void Error(std::wstring msg);
