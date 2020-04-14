@@ -101,10 +101,12 @@ void ShowHidePreviewWindow(bool show)
 
     // Start with rect centered around cursor, and move to be entirely in work area
     const SIZE sz = { DPISCALE(WindowSize.cx), DPISCALE(WindowSize.cy) };
-    RECT rc = { ptCursor.x - (sz.cx / 2),
+    RECT rc{
+        ptCursor.x - (sz.cx / 2),
         ptCursor.y - (sz.cy / 2),
         ptCursor.x + (sz.cx / 2),
-        ptCursor.y + (sz.cy / 2) };
+        ptCursor.y + (sz.cy / 2),
+    };
     rc = KeepRectInRect(rc, WorkAreaFromPoint(ptCursor));
 
     // Position and show window
@@ -155,19 +157,19 @@ bool CreatePreviewWindow()
 {
     const LPCWSTR szPreviewWindowClass = L"keepalive_class_previewwnd";
 
-    WNDCLASSEX wcex = {};
+    WNDCLASSEX wcex{};
     wcex.cbSize = sizeof(WNDCLASSEX);
     wcex.style = CS_DBLCLKS;
     wcex.lpfnWndProc = PreviewWndProc;
-    wcex.cbClsExtra = 0;
-    wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
-    wcex.hIcon = NULL;
-    wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wcex.hbrBackground = (HBRUSH)GetStockObject(COLOR_WINDOW + 1);
-    wcex.lpszMenuName = NULL;
     wcex.lpszClassName = szPreviewWindowClass;
-    wcex.hIconSm = NULL;
+    //wcex.cbClsExtra = 0;
+    //wcex.cbWndExtra = 0;
+    //wcex.hIcon = nullptr;
+    //wcex.lpszMenuName = nullptr;
+    //wcex.hIconSm = nullptr;
 
     if (RegisterClassEx(&wcex) == 0)
     {
@@ -175,13 +177,7 @@ bool CreatePreviewWindow()
         return FALSE;
     }
 
-    if (CreateWindowEx(
-            WS_EX_TOOLWINDOW,
-            szPreviewWindowClass,
-            L"",
-            WS_POPUP,
-            0, 0, 0, 0,
-            nullptr, nullptr, hInstance, nullptr) == nullptr)
+    if (CreateWindowEx(WS_EX_TOOLWINDOW, szPreviewWindowClass, L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, hInstance, nullptr) == nullptr)
     {
         Error(L"Create Preview Window failed!");
         return false;

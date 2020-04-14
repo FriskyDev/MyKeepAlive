@@ -1,5 +1,8 @@
 
 #include "MyKeepAlive.h"
+
+#include <CommCtrl.h>
+
 using namespace std;
 
 HWND hwndTray                   = nullptr;
@@ -13,12 +16,25 @@ const UINT TimerMS              = 10000; // 10 seconds
 #define IDM_EXIT                111
 #define IDM_TOGGLEPAUSE         112
 #define IDM_TOGGLEONSTARTUP     113
+#define IDM_TOGGLESCHEDULE      114
+#define IDM_CONFIGURE           115
+
 
 // On the timer, if not paused, inject ghost input
 void TimerCallback(HWND, UINT, UINT_PTR, DWORD)
 {
     if (!IsPaused())
     {
+        if (IsScheduled())
+        {
+            SYSTEMTIME time;
+            GetLocalTime(&time);
+            if (!TimeInSchedule(time)) {
+                // bail, we are outside the schedule
+                return;
+            }
+        }
+
         InjectGhostInput();
     }
 }
@@ -41,10 +57,8 @@ void UpdateShellIconInfo(DWORD msg)
 
 void UpdateTrayWindow()
 {
-    static HICON hIconOn = LoadIcon(hInstance,
-        (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC_ACTIVE));
-    static HICON hIconOff = LoadIcon(hInstance,
-        (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC));
+    static HICON hIconOn = LoadIcon(hInstance, (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC_ACTIVE));
+    static HICON hIconOff = LoadIcon(hInstance, (LPCTSTR)MAKEINTRESOURCE(IDI_HANDPIC));
 
     // Update the icon to reflect pause state
     nid.hIcon = (IsPaused() ? hIconOff : hIconOn);
@@ -84,31 +98,21 @@ void RightClickMenu()
 
     HMENU hMenu = CreatePopupMenu();
 
-    InsertMenu(hMenu,
-        0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_TOGGLEPAUSE,
-        L"Pause");
+    // schedule menu items
+    InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, IDM_CONFIGURE, L"Configure...");
+    InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, IDM_TOGGLESCHEDULE, L"Use Schedule");
+    CheckMenuItem(hMenu, IDM_TOGGLESCHEDULE, IsScheduled() ? MF_CHECKED : MF_UNCHECKED);
 
-    CheckMenuItem(hMenu,
-        IDM_TOGGLEPAUSE,
-        IsPaused() ? MF_CHECKED : MF_UNCHECKED);
+    // pause
+    InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, IDM_TOGGLEPAUSE, L"Pause");
+    CheckMenuItem(hMenu, IDM_TOGGLEPAUSE, IsPaused() ? MF_CHECKED : MF_UNCHECKED);
 
-    InsertMenu(hMenu,
-        0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_TOGGLEONSTARTUP,
-        L"Run On Startup");
+    // run on startup
+    InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, IDM_TOGGLEONSTARTUP, L"Run On Startup");
+    CheckMenuItem(hMenu, IDM_TOGGLEONSTARTUP, IsRunOnStartupSet() ? MF_CHECKED : MF_UNCHECKED);
 
-    CheckMenuItem(hMenu,
-        IDM_TOGGLEONSTARTUP,
-        IsRunOnStartupSet() ? MF_CHECKED : MF_UNCHECKED);
-
-    InsertMenu(hMenu,
-        0xFFFFFFFF,
-        MF_BYPOSITION | MF_STRING,
-        IDM_EXIT,
-        L"Exit");
+    // exit
+    InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, IDM_EXIT, L"Exit");
 
     WellBehavedTrackPopup(hwndTray, hMenu, pt);
 }
@@ -170,6 +174,14 @@ LRESULT CALLBACK TrayWindowWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARA
         case IDM_TOGGLEONSTARTUP:
             ToggleRunOnStartup();
             break;
+
+        case IDM_TOGGLESCHEDULE:
+            ToggleSchedule();
+            break;
+
+        case IDM_CONFIGURE:
+            Configure();
+            break;
         }
         break;
     }
@@ -214,7 +226,6 @@ bool CreateTrayWindow()
         WS_OVERLAPPEDWINDOW,
         0, 0, 0, 0,
         nullptr, nullptr, hInstance, nullptr);
-
     if (!hwnd)
     {
         Error(L"CreateWindow failed on tray window!");

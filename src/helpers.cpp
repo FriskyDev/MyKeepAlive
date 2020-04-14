@@ -2,12 +2,12 @@
 #include "MyKeepAlive.h"
 using namespace std;
 
-void Error(std::wstring msg)
+void Error(const std::wstring& msg)
 {
     MessageBox(nullptr, msg.c_str(), _T("Error"), MB_OK);
     PostQuitMessage(1);
 }
-void Warning(std::wstring msg)
+void Warning(const std::wstring& msg)
 {
     MessageBox(nullptr, msg.c_str(), _T("Warning"), MB_OK);
 }
@@ -81,4 +81,26 @@ void ReCreateFont(HFONT* phFont, UINT size, LPCWSTR fontName)
     {
         Error(L"Draw preview window failed to create fonts.");
     }
+}
+
+std::wstring GetErrorMessage(DWORD dwError)
+{
+    if (dwError == 0) {
+        dwError = GetLastError();
+    }
+
+    LPVOID lpMsgBuf{};
+    FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        dwError,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPTSTR)&lpMsgBuf,
+        0, NULL);
+
+    std::wstring error_message = (LPCWSTR)lpMsgBuf;
+    LocalFree(lpMsgBuf);
+    return error_message;
 }
